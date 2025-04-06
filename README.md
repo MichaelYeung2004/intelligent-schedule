@@ -157,4 +157,7 @@
     git remote add origin <your_github_or_gitee_repo_url>
     git push -u origin main # 或者 master
     ```
-*   **仓库链接:** (请替换为你自己的链接) `https://github.com/your_username/intelligent-schedule` 或 `https://gitee.com/your_username/intelligent-schedule`
+*   **仓库链接:** (请替换为你自己的链接) `https://github.com/MichaelYeung2004/intelligent-schedule` 
+
+**代码仓库**
+  ![image](https://github.com/user-attachments/assets/76ef9b81-78da-4bcc-b8e6-ae364d8e053a)
