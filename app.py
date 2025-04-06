@@ -4,7 +4,7 @@ import time
 import random
 from flask import Flask, request, jsonify, render_template, session
 
-# --- 配置 ---
+# --- (保持你现有的配置和其它路由不变) ---
 app = Flask(__name__, template_folder='templates')
 # !!! 重要: 在生产环境中请使用更安全的随机密钥 !!!
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'a_very_secret_and_random_key_for_dev')
@@ -19,17 +19,45 @@ DATA_DIR = 'data'
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
-# 诗词数据 (来自前端)
+# 诗词数据 (保持不变)
 poetryDatabase = [
-    { "content": "人生得意须尽欢，莫使金樽空对月。", "author": "李白《将进酒》" },
+    {"content": "人生得意须尽欢，莫使金樽空对月。", "author": "李白《将进酒》" },
     { "content": "会当凌绝顶，一览众山小。", "author": "杜甫《望岳》" },
     { "content": "海上生明月，天涯共此时。", "author": "张九龄《望月怀远》" },
     { "content": "春风又绿江南岸，明月何时照我还。", "author": "王安石《泊船瓜洲》" },
     { "content": "落霞与孤鹜齐飞，秋水共长天一色。", "author": "王勃《滕王阁序》" },
-    # ... (可以添加更多诗词)
+    { "content": "但愿人长久，千里共婵娟。", "author": "苏轼《水调歌头·明月几时有》" },
+    { "content": "不识庐山真面目，只缘身在此山中。", "author": "苏轼《题西林壁》" },
+    { "content": "众里寻他千百度，蓦然回首，那人却在，灯火阑珊处。", "author": "辛弃疾《青玉案·元夕》" },
+    { "content": "疏影横斜水清浅，暗香浮动月黄昏。", "author": "林逋《山园小梅》" },
+    { "content": "无可奈何花落去，似曾相识燕归来。", "author": "晏殊《浣溪沙·一曲新词酒一杯》" },
+    { "content": "野火烧不尽，春风吹又生。", "author": "白居易《赋得古原草送别》" },
+    { "content": "山重水复疑无路，柳暗花明又一村。", "author": "陆游《游山西村》" },
+    { "content": "春蚕到死丝方尽，蜡炬成灰泪始干。", "author": "李商隐《无题》" },
+    { "content": "明月松间照，清泉石上流。", "author": "王维《山居秋暝》" },
+    { "content": "停车坐爱枫林晚，霜叶红于二月花。", "author": "杜牧《山行》" },
+    { "content": "知否？知否？应是绿肥红瘦。", "author": "李清照《如梦令·昨夜雨疏风骤》" },
+    { "content": "大江东去，浪淘尽，千古风流人物。", "author": "苏轼《念奴娇·赤壁怀古》" },
+    { "content": "两情若是久长时，又岂在朝朝暮暮。", "author": "秦观《鹊桥仙·纤云弄巧》" },
+    { "content": "衣带渐宽终不悔，为伊消得人憔悴。", "author": "柳永《蝶恋花·伫倚危楼风细细》" },
+    { "content": "人生自古谁无死？留取丹心照汗青。", "author": "文天祥《过零丁洋》" },
+    { "content": "花自飘零水自流。一种相思，两处闲愁。", "author": "李清照《一剪梅·红藕香残玉簟秋》" },
+    { "content": "莫道不销魂，帘卷西风，人比黄花瘦。", "author": "李清照《醉花阴·薄雾浓云愁永昼》" },
+    { "content": "身无彩凤双飞翼，心有灵犀一点通。", "author": "李商隐《无题》" },
+    { "content": "曾经沧海难为水，除却巫山不是云。", "author": "元稹《离思五首·其四》" },
+    { "content": "玲珑骰子安红豆，入骨相思知不知。", "author": "温庭筠《南歌子词二首 / 新添声杨柳枝词》" },
+    { "content": "愿我如星君如月，夜夜流光相皎洁。", "author": "范成大《车遥遥篇》" },
+    { "content": "只愿君心似我心，定不负相思意。", "author": "李之仪《卜算子·我住长江头》" },
+    { "content": "桃之夭夭，灼灼其华。之子于归，宜其室家。", "author": "《诗经·周南·桃夭》" },
+    { "content": "青青子衿，悠悠我心。纵我不往，子宁不嗣音？", "author": "《诗经·郑风·子衿》" },
+    { "content": "在天愿作比翼鸟，在地愿为连理枝。", "author": "白居易《长恨歌》" },
+    { "content": "自在飞花轻似梦，无边丝雨细如愁。", "author": "秦观《浣溪沙·漠漠轻寒上小楼》" },
+    { "content": "人面不知何处去，桃花依旧笑春风。", "author": "崔护《题都城南庄》" },
+    { "content": "相见时难别亦难，东风无力百花残。", "author": "李商隐《无题》" },
+    { "content": "投我以木桃，报之以琼瑶。匪报也，永以为好也！", "author": "《诗经·卫风·木瓜》" }
 ]
 
-# --- 数据处理函数 ---
+# --- (保持你现有的数据处理函数: get_user_data_path, load_data, save_data) ---
 def get_user_data_path():
     """获取当前用户的数据文件路径"""
     user_id = session.get('user_id', 'guest') # 默认为 'guest'
@@ -77,8 +105,7 @@ def save_data(data):
         print(f"Error saving data to {path}: {e}")
         return False # 表示保存失败
 
-# --- 路由 ---
-
+# --- (保持你现有的其它 API 路由: /, /api/status, /api/login, ...) ---
 # 1. 根路由 - 提供前端页面
 @app.route('/')
 def index():
@@ -107,9 +134,10 @@ def login():
         return jsonify({'error': '请输入用户名和密码'}), 400
 
     # --- 简化版登录逻辑 ---
-    # 在实际应用中，这里应该查询数据库并验证密码哈希值
     print(f"Login attempt for user: {username}") # 打印日志
     session['user_id'] = username # 登录成功，设置 session
+    # 登录时，清除可能存在的旧诗词索引，以便重新开始
+    session.pop('available_poem_indices', None)
     return jsonify({'username': username, 'initial': username[0].upper()})
 
 # 4. API - 注册
@@ -127,11 +155,12 @@ def register():
          return jsonify({'error': '密码长度不能少于6位'}), 400
 
     # --- 简化版注册逻辑 ---
-    # 实际应用中：检查用户名/邮箱是否已存在，哈希密码，存储用户信息
     print(f"Registration attempt: username={username}, email={email}") # 打印日志
 
     # 注册成功后直接登录
     session['user_id'] = username
+    # 注册时也清除旧诗词索引
+    session.pop('available_poem_indices', None)
     return jsonify({'username': username, 'initial': username[0].upper()}), 201 # 返回 201 Created
 
 # 5. API - 登出
@@ -139,8 +168,13 @@ def register():
 def logout():
     """处理用户登出"""
     user_id = session.pop('user_id', None) # 从 session 移除 user_id
+    # 登出时，也清除该用户的诗词索引记录
+    session.pop('available_poem_indices', None)
     print(f"User logged out: {user_id}")
     return jsonify({'message': '登出成功'})
+
+# --- (保持你现有的课程 API: /api/courses, /api/courses/<id>, /api/courses/import) ---
+# ... (此处省略课程相关的 API 代码，保持原样) ...
 
 # 6. API - 获取课程 (Read)
 @app.route('/api/courses', methods=['GET'])
@@ -264,10 +298,7 @@ def delete_course(course_id):
     user_data['courses'] = courses # 更新回字典
 
     if save_data(user_data):
-        # 返回 204 No Content 通常表示成功删除且无内容返回
-        # 但前端可能需要一个确认信息，所以返回 200 OK + message
         return jsonify({'message': '课程删除成功'})
-        # 或者 return '', 204
     else:
         return jsonify({'error': '删除课程失败'}), 500
 
@@ -307,10 +338,9 @@ def import_courses():
 
         # 颜色处理: 记录每个课程名称第一次出现的颜色
         if course['name'] not in imported_name_color_map:
-             # 如果导入的数据没提供有效颜色，则基于名字分配一个 (需要getOrAssignColor逻辑)
-             # 简化：直接用它提供的，或者用默认
+             # 如果导入的数据没提供有效颜色，则基于名字分配一个
              default_colors = ['bg-red-400', 'bg-blue-400', 'bg-green-400', 'bg-yellow-400', 'bg-purple-400', 'bg-pink-400', 'bg-indigo-400', 'bg-teal-400', 'bg-orange-400', 'bg-gray-400']
-             valid_color = course['color'] if course['color'].startswith('bg-') and course['color'].split('-')[1].isdigit() else default_colors[len(imported_name_color_map) % len(default_colors)]
+             valid_color = course['color'] if course['color'].startswith('bg-') and len(course['color'].split('-')) > 1 and course['color'].split('-')[1].isdigit() else default_colors[len(imported_name_color_map) % len(default_colors)]
              imported_name_color_map[course['name']] = valid_color
              course['color'] = valid_color
         else:
@@ -330,13 +360,47 @@ def import_courses():
     else:
         return jsonify({'error': '保存导入的课程失败'}), 500
 
-# 11. API - 获取诗词
+
+# 11. API - 获取诗词 (修改后)
 @app.route('/api/poetry', methods=['GET'])
 def get_poetry():
-    """随机获取一首诗词"""
+    """
+    为当前用户随机获取一首不同的诗词。
+    会记录用户已看过的诗词索引，直到所有诗词都被看过一遍后，重新开始循环。
+    """
     if not poetryDatabase:
         return jsonify({'error': '诗词库为空'}), 500
-    poem = random.choice(poetryDatabase)
+
+    # 尝试从 session 中获取当前用户还“未”看过的诗词的索引列表
+    available_indices = session.get('available_poem_indices')
+
+    # 如果 session 中没有这个列表，或者列表为空（表示是新会话或已完成一轮）
+    if not available_indices:
+        # 初始化/重置列表，包含从 0 到 len(poetryDatabase)-1 的所有索引
+        available_indices = list(range(len(poetryDatabase)))
+        # 随机打乱这个列表的顺序，这样每次循环展示的顺序都不同
+        random.shuffle(available_indices)
+        # 打印日志，方便调试
+        user_display = session.get('user_id', 'guest') # 显示用户名或guest
+        print(f"用户 '{user_display}' 的诗词索引已重置/初始化。")
+
+    # 从打乱后的“可用索引列表”中取出一个索引（pop()通常比random.choice + remove效率稍高）
+    # 由于列表已打乱，pop()取出的也是随机的
+    chosen_index = available_indices.pop()
+
+    # 根据选中的索引，从原始诗词数据库中获取诗词内容
+    poem = poetryDatabase[chosen_index]
+
+    # !!! 重要：将修改后的（移除了一个索引的）列表存回 session 中
+    session['available_poem_indices'] = available_indices
+    # 如果你是直接在session取出的列表上操作（比如用remove），可能需要下面这行
+    # session.modified = True
+
+    # 打印日志，方便追踪
+    user_display = session.get('user_id', 'guest')
+    print(f"向用户 '{user_display}' 提供诗词索引 {chosen_index}。剩余可用: {len(available_indices)}")
+
+    # 返回选中的诗词
     return jsonify(poem)
 
 
