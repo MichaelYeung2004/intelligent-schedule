@@ -2,13 +2,13 @@
 
 本项目是一个基于 Web 的课程表管理应用，使用 Flask 作为后端，纯 HTML/CSS/JavaScript 作为前端。用户可以添加、查看、编辑、删除课程，并支持简单的用户登录/注册、课程导入导出等功能。
 
-**技术栈**
+## 技术栈
 
 *   **后端:** Python 3, Flask
 *   **前端:** HTML, Tailwind CSS (CDN), JavaScript
 *   **数据存储:** 本地 JSON 文件 (每个用户一个文件，存储在 `data/` 目录下)
 
-**功能列表**
+## 功能列表
 
 1.  **添加课程 (Create):** 通过模态框输入课程名称、教师、地点、星期、时间段、颜色，并保存。相同名称的课程会自动应用相同颜色。
 2.  **查询课程 (Read):**
@@ -29,45 +29,57 @@
     *   **今日诗词:** 左侧面板显示一句随机诗词，可刷新。
     *   **番茄钟:** 右下角提供一个可配置的番茄工作法计时器 (纯前端实现)。
 
-**环境准备**
+## 环境准备
 
-1.  **安装 Python 3:** 确保你的系统已安装 Python 3.6 或更高版本。
-2.  **克隆仓库 (如果使用 Git):**
-    ```bash
-    git clone <your-repo-url>
-    cd intelligent-schedule
-    ```
-    或者直接下载代码压缩包并解压。
-3.  **创建虚拟环境 (推荐):**
-    ```bash
-    python -m venv venv
-    # Windows
-    venv\Scripts\activate
-    # macOS/Linux
-    source venv/bin/activate
-    ```
-4.  **安装依赖:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+1. **安装 Python 3:** 确保你的系统已安装 Python 3.6 或更高版本。
 
-**运行程序**
+2. **克隆仓库 (如果使用 Git):**
 
-1.  确保虚拟环境已激活。
-2.  在项目根目录 (`intelligent-schedule/`) 运行 Flask 应用：
-    ```bash
-    python app.py
-    ```
-3.  程序启动后，会提示类似信息：
-    ```
-     * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)
-     * Restarting with stat
-     * Debugger is active!
-     * Debugger PIN: ...
-    ```
-4.  打开浏览器，访问 `http://127.0.0.1:5000/` 即可开始使用。
+   ```bash
+   git clone <your-repo-url>
+   cd intelligent-schedule
+   ```
 
-**AI 及个人实操过程**
+   或者直接下载代码压缩包并解压。
+
+3. **创建虚拟环境 (推荐):**
+
+   ```bash
+   python -m venv venv
+   # Windows
+   venv\Scripts\activate
+   # macOS/Linux
+   source venv/bin/activate
+   ```
+
+4. **安装依赖:**
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+## 运行程序
+
+1. 确保虚拟环境已激活。
+
+2. 在项目根目录 (`intelligent-schedule/`) 运行 Flask 应用：
+
+   ```bash
+   python app.py
+   ```
+
+3. 程序启动后，会提示类似信息：
+
+   ```
+    * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)
+    * Restarting with stat
+    * Debugger is active!
+    * Debugger PIN: ...
+   ```
+
+4. 打开浏览器，访问 `http://127.0.0.1:5000/` 即可开始使用。
+
+## AI 及个人实操过程
 
 1.  **需求分析:** 明确需要实现一个包含 CRUD 功能、图形界面、用户认证、导入导出等功能的课程表应用。前端已部分完成。
 2.  **技术选型:** 选择 Python Flask 作为后端框架，因为它轻量且易于与现有前端集成。选择 JSON 文件作为数据存储，简化部署和开发初期复杂度。
@@ -100,9 +112,9 @@
     *   打开浏览器访问前端。
     *   逐一测试所有功能：添加、编辑、删除、搜索、导入（准备测试文件）、导出、登录、注册、登出、诗词刷新、下一节课显示。
     *   使用浏览器开发者工具 (F12) 查看网络请求 (Network tab) 和控制台输出 (Console tab) 来调试前后端交互问题。
-10. **文档编写 (个人实操):** 撰写 README 文件，说明项目、功能、使用方法、开发过程。
+10.  **文档编写 (个人实操):** 撰写 README 文件，说明项目、功能、使用方法、开发过程。
 
-**四项核心功能实现说明**
+## 四项核心功能实现说明
 
 1.  **添加课程 (Create):**
     *   **前端:** 用户在 "添加新课程" 模态框中填写信息，点击 "保存"。JavaScript (`saveCourse` 函数) 收集表单数据，构建一个课程对象。
@@ -128,36 +140,22 @@
     *   **后端:** Flask 路由 (`delete_course`) 接收请求，获取 `course_id`。加载用户数据，从课程列表中移除具有该 `id` 的课程对象，然后保存更新后的数据文件 (`save_data`)。返回成功信息或 `204 No Content`。
     *   **前端:** `fetch` 成功后，调用 `loadCourses()` 重新加载并刷新界面。
 
-**最终软件运行效果截图**
+## 最终软件运行效果截图
 
-(这里需要你自己运行程序后截图，展示以下界面)
+1. **主界面截图:** 显示课程表网格、左侧面板（课程列表、下一节课、诗词等）。
+   ![image-20250406214448631](https://raw.githubusercontent.com/MichaelYeung2004/image/main/img/20250406214449158.png)
 
-1.  **主界面截图:** 显示课程表网格、左侧面板（课程列表、下一节课、诗词等）。
-    ![主界面](placeholder_main_interface.png)
-2.  **添加/编辑课程模态框截图:** 显示正在添加或编辑课程的弹出窗口。
-    ![添加编辑模态框](placeholder_modal_add_edit.png)
-3.  **课程详情模态框截图:** 显示点击课程后弹出的详情窗口。
-    ![课程详情模态框](placeholder_modal_detail.png)
-4.  **登录/注册模态框截图:** 显示登录或注册的弹出窗口。
-    ![登录注册模态框](placeholder_modal_auth.png)
-5.  **导入/导出操作示意截图 (可选):** 显示导入确认或触发导出的界面部分。
-    ![导入导出](placeholder_import_export.png)
+   ![image-20250406214558006](https://raw.githubusercontent.com/MichaelYeung2004/image/main/img/20250406214558536.png)
 
-*(请将 `placeholder_*.png` 替换为实际截图)*
+2. **添加/编辑课程模态框截图:** 显示正在添加或编辑课程的弹出窗口。
+   ![image-20250406214637990](https://raw.githubusercontent.com/MichaelYeung2004/image/main/img/20250406214638207.png)
 
-**代码仓库**
+3. **课程详情模态框截图:** 显示点击课程后弹出的详情窗口。
+   ![image-20250406214712290](https://raw.githubusercontent.com/MichaelYeung2004/image/main/img/20250406214712607.png)
 
-*   你可以将 `intelligent-schedule` 文件夹初始化为 Git 仓库，并将代码推送到 GitHub/Gitee。
-    ```bash
-    cd intelligent-schedule
-    git init
-    git add .
-    git commit -m "Initial commit: Flask backend and integrated frontend"
-    # 配置远程仓库并推送
-    git remote add origin <your_github_or_gitee_repo_url>
-    git push -u origin main # 或者 master
-    ```
-*   **仓库链接:** (请替换为你自己的链接) `https://github.com/MichaelYeung2004/intelligent-schedule` 
+4. **登录/注册模态框截图:** 显示登录或注册的弹出窗口。
+   ![image-20250406214915778](https://raw.githubusercontent.com/MichaelYeung2004/image/main/img/20250406214915870.png)
 
-**代码仓库**
-  ![image](https://github.com/user-attachments/assets/76ef9b81-78da-4bcc-b8e6-ae364d8e053a)
+5. **导入/导出操作示意截图 (可选):** 显示导入确认或触发导出的界面部分。
+   ![image-20250406215000094](https://raw.githubusercontent.com/MichaelYeung2004/image/main/img/20250406215000358.png)
+
