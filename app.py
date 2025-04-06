@@ -3,23 +3,98 @@ import json
 import time
 import random
 from flask import Flask, request, jsonify, render_template, session
+# 重新引入密码哈希功能
+from werkzeug.security import generate_password_hash, check_password_hash
 
-# --- (保持你现有的配置和其它路由不变) ---
+# --- 配置 ---
 app = Flask(__name__, template_folder='templates')
-# !!! 重要: 在生产环境中请使用更安全的随机密钥 !!!
-app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'a_very_secret_and_random_key_for_dev')
-# 设置 Session 的 cookie 属性，增强安全性
+# !!! 强烈建议更换一个新的、更复杂的密钥 !!!
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'another_very_secret_random_key_dev_3')
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE='Lax', # 或 'Strict'
-    # SESSION_COOKIE_SECURE=True,  # 仅在 HTTPS 环境下启用
+    SESSION_COOKIE_SAMESITE='Lax',
+    # SESSION_COOKIE_SECURE=True, # 仅在 HTTPS 下启用
 )
 
 DATA_DIR = 'data'
+USERS_FILE = os.path.join(DATA_DIR, 'users.json') # 用户凭证文件路径
+
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
-# 诗词数据 (保持不变)
+# --- 用户数据处理函数 ---
+def load_users():
+    """加载用户凭证数据"""
+    if not os.path.exists(USERS_FILE):
+        return {}
+    try:
+        with open(USERS_FILE, 'r', encoding='utf-8') as f:
+            users = json.load(f)
+            return users if isinstance(users, dict) else {}
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"Error loading users from {USERS_FILE}: {e}")
+        return {}
+
+def save_users(users):
+    """保存用户凭证数据"""
+    if not isinstance(users, dict):
+         print(f"Error: Invalid data type passed to save_users. Aborting save.")
+         return False
+    try:
+        with open(USERS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
+        return True
+    except IOError as e:
+        print(f"Error saving users to {USERS_FILE}: {e}")
+        return False
+
+# --- 课程数据处理函数 (保持不变) ---
+def get_user_data_path():
+    user_id = session.get('user_id', 'guest')
+    safe_user_id = "".join(c for c in user_id if c.isalnum() or c in ('_', '-')).rstrip()
+    if not safe_user_id:
+        safe_user_id = 'guest'
+    return os.path.join(DATA_DIR, f"{safe_user_id}.json")
+
+def load_data():
+    path = get_user_data_path()
+    if not os.path.exists(path):
+        return {'courses': []}
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            if 'courses' not in data or not isinstance(data['courses'], list):
+                print(f"Warning: Invalid or missing 'courses' list in {path}. Returning empty list.")
+                return {'courses': []}
+            valid_courses = []
+            # 稍微加强课程数据验证
+            for course in data.get('courses', []):
+                if isinstance(course, dict) and all(k in course for k in ('id', 'name', 'day', 'time')):
+                     course.setdefault('color', 'bg-gray-400') # 提供默认值
+                     course.setdefault('teacher', 'N/A')
+                     course.setdefault('location', 'N/A')
+                     valid_courses.append(course)
+                else:
+                    print(f"Warning: Skipping invalid course data for user '{session.get('user_id', 'guest')}': {course}")
+            return {'courses': valid_courses}
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"Error loading data from {path}: {e}")
+        return {'courses': []}
+
+def save_data(data):
+    path = get_user_data_path()
+    try:
+        if 'courses' not in data or not isinstance(data['courses'], list):
+            print(f"Error: Invalid data structure passed to save_data for user '{session.get('user_id', 'guest')}' (path: {path}). Aborting save.")
+            return False
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return True
+    except IOError as e:
+        print(f"Error saving data to {path}: {e}")
+        return False
+
+# --- 丰富的诗词数据 ---
 poetryDatabase = [
     {"content": "人生得意须尽欢，莫使金樽空对月。", "author": "李白《将进酒》" },
     { "content": "会当凌绝顶，一览众山小。", "author": "杜甫《望岳》" },
@@ -57,147 +132,119 @@ poetryDatabase = [
     { "content": "投我以木桃，报之以琼瑶。匪报也，永以为好也！", "author": "《诗经·卫风·木瓜》" }
 ]
 
-# --- (保持你现有的数据处理函数: get_user_data_path, load_data, save_data) ---
-def get_user_data_path():
-    """获取当前用户的数据文件路径"""
-    user_id = session.get('user_id', 'guest') # 默认为 'guest'
-    # 基本的文件名清理，防止路径遍历
-    safe_user_id = "".join(c for c in user_id if c.isalnum() or c in ('_', '-')).rstrip()
-    if not safe_user_id: # 如果清理后为空，则使用 guest
-        safe_user_id = 'guest'
-    return os.path.join(DATA_DIR, f"{safe_user_id}.json")
+# --- API 路由 ---
 
-def load_data():
-    """加载当前用户的数据"""
-    path = get_user_data_path()
-    if not os.path.exists(path):
-        return {'courses': []} # 返回默认结构
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            # 确保返回的数据总是有 'courses' 键，且是列表
-            if 'courses' not in data or not isinstance(data['courses'], list):
-                return {'courses': []}
-            # 确保每个课程都有必要的字段 (基本验证)
-            valid_courses = []
-            for course in data['courses']:
-                if isinstance(course, dict) and all(k in course for k in ('id', 'name', 'day', 'time', 'color')):
-                    valid_courses.append(course)
-                else:
-                    print(f"Warning: Skipping invalid course data for user '{session.get('user_id', 'guest')}': {course}")
-            return {'courses': valid_courses}
-    except (json.JSONDecodeError, IOError) as e:
-        print(f"Error loading data from {path}: {e}")
-        return {'courses': []} # 出错时返回空
-
-def save_data(data):
-    """保存当前用户的数据"""
-    path = get_user_data_path()
-    try:
-        # 确保 data 包含 'courses' 键
-        if 'courses' not in data or not isinstance(data['courses'], list):
-            print(f"Error: Invalid data structure passed to save_data for user '{session.get('user_id', 'guest')}'. Aborting save.")
-            return False # 表示保存失败
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        return True # 表示保存成功
-    except IOError as e:
-        print(f"Error saving data to {path}: {e}")
-        return False # 表示保存失败
-
-# --- (保持你现有的其它 API 路由: /, /api/status, /api/login, ...) ---
-# 1. 根路由 - 提供前端页面
 @app.route('/')
 def index():
-    """渲染主页面"""
     return render_template('index.html')
 
-# 2. API - 获取当前用户状态
 @app.route('/api/status', methods=['GET'])
 def get_status():
-    """检查用户登录状态"""
     user_id = session.get('user_id')
     if user_id:
         return jsonify({'user': {'username': user_id, 'initial': user_id[0].upper()}})
     else:
         return jsonify({'user': None})
 
-# 3. API - 登录
+# --- 登录 API (包含密码验证) ---
 @app.route('/api/login', methods=['POST'])
 def login():
-    """处理用户登录"""
     data = request.json
     username = data.get('username')
-    password = data.get('password') # 实际应用中需要验证密码
+    password = data.get('password')
 
     if not username or not password:
         return jsonify({'error': '请输入用户名和密码'}), 400
 
-    # --- 简化版登录逻辑 ---
-    print(f"Login attempt for user: {username}") # 打印日志
-    session['user_id'] = username # 登录成功，设置 session
-    # 登录时，清除可能存在的旧诗词索引，以便重新开始
-    session.pop('available_poem_indices', None)
-    return jsonify({'username': username, 'initial': username[0].upper()})
+    users = load_users()
+    user_data = users.get(username)
 
-# 4. API - 注册
+    if user_data is None:
+        print(f"Login failed: User '{username}' not found.")
+        return jsonify({'error': '用户不存在或密码错误'}), 401 # 统一返回 401
+
+    stored_hash = user_data.get('hashed_password')
+    if not stored_hash:
+         print(f"Login failed: User '{username}' data is corrupted (no hash).")
+         return jsonify({'error': '用户数据错误'}), 500
+
+    if check_password_hash(stored_hash, password):
+        # 密码正确
+        session['user_id'] = username
+        session.pop('available_poem_indices', None) # 清除旧诗词记录
+        print(f"Login successful for user: {username}")
+        return jsonify({'username': username, 'initial': username[0].upper()})
+    else:
+        # 密码错误
+        print(f"Login failed: Incorrect password for user '{username}'.")
+        return jsonify({'error': '用户不存在或密码错误'}), 401 # 统一返回 401
+
+# --- 注册 API (包含密码哈希和用户存储) ---
 @app.route('/api/register', methods=['POST'])
 def register():
-    """处理用户注册"""
     data = request.json
     username = data.get('username')
-    email = data.get('email')
+    email = data.get('email') # 邮箱暂时只存储
     password = data.get('password')
 
     if not username or not email or not password:
         return jsonify({'error': '请填写所有注册信息'}), 400
     if len(password) < 6:
          return jsonify({'error': '密码长度不能少于6位'}), 400
+    # 可以添加更多验证，如用户名格式、邮箱格式等
 
-    # --- 简化版注册逻辑 ---
-    print(f"Registration attempt: username={username}, email={email}") # 打印日志
+    users = load_users()
 
-    # 注册成功后直接登录
-    session['user_id'] = username
-    # 注册时也清除旧诗词索引
-    session.pop('available_poem_indices', None)
-    return jsonify({'username': username, 'initial': username[0].upper()}), 201 # 返回 201 Created
+    if username in users:
+        print(f"Registration failed: Username '{username}' already exists.")
+        return jsonify({'error': '用户名已存在'}), 409 # 409 Conflict
 
-# 5. API - 登出
+    # 用户名可用，哈希密码并存储
+    hashed_password = generate_password_hash(password)
+    users[username] = {
+        'hashed_password': hashed_password,
+        'email': email
+        # 可以添加注册时间等其他信息
+        # 'registered_at': time.time()
+    }
+
+    if save_users(users):
+        # 注册成功，直接登录
+        session['user_id'] = username
+        session.pop('available_poem_indices', None) # 清除诗词记录
+        print(f"Registration successful for user: {username}")
+        return jsonify({'username': username, 'initial': username[0].upper()}), 201
+    else:
+        # 保存用户文件失败
+        print(f"Registration failed: Could not save users file.")
+        return jsonify({'error': '注册失败，服务器内部错误'}), 500
+
 @app.route('/api/logout', methods=['POST'])
 def logout():
-    """处理用户登出"""
-    user_id = session.pop('user_id', None) # 从 session 移除 user_id
-    # 登出时，也清除该用户的诗词索引记录
-    session.pop('available_poem_indices', None)
+    user_id = session.pop('user_id', None)
+    session.pop('available_poem_indices', None) # 登出时清除诗词记录
     print(f"User logged out: {user_id}")
     return jsonify({'message': '登出成功'})
 
-# --- (保持你现有的课程 API: /api/courses, /api/courses/<id>, /api/courses/import) ---
-# ... (此处省略课程相关的 API 代码，保持原样) ...
-
-# 6. API - 获取课程 (Read)
+# --- 课程 API (保持不变) ---
 @app.route('/api/courses', methods=['GET'])
 def get_courses():
-    """获取当前用户的所有课程"""
     user_data = load_data()
-    return jsonify(user_data.get('courses', [])) # 确保总返回列表
+    return jsonify(user_data.get('courses', []))
 
-# 7. API - 添加课程 (Create)
 @app.route('/api/courses', methods=['POST'])
 def add_course():
-    """添加新课程"""
     new_course_data = request.json
-    if not new_course_data or not all(k in new_course_data for k in ('name', 'teacher', 'location', 'day', 'time', 'color')):
-        return jsonify({'error': '缺少课程信息'}), 400
+    if not new_course_data or not all(k in new_course_data for k in ('name', 'day', 'time', 'color')): # teacher, location can be optional
+        return jsonify({'error': '缺少必要的课程信息(名称, 星期, 时间段, 颜色)'}), 400
+    # 为可选字段提供默认值
+    new_course_data.setdefault('teacher', 'N/A')
+    new_course_data.setdefault('location', 'N/A')
 
     user_data = load_data()
     courses = user_data.get('courses', [])
-
-    # 为新课程分配唯一 ID (使用时间戳 + 随机数避免快速点击冲突)
     new_course_data['id'] = int(time.time() * 1000) + random.randint(0, 999)
 
-    # 检查颜色逻辑：如果新课程名已存在，使用已存在的颜色
     existing_color = None
     for course in courses:
         if course.get('name') == new_course_data['name'] and course.get('color'):
@@ -205,26 +252,22 @@ def add_course():
             break
     if existing_color:
         new_course_data['color'] = existing_color
-    # 如果新课程名不存在，但有其他同名课程需要更新颜色，则一起更新
-    elif 'color' in new_course_data:
+    else: # 如果是新名称，确保提交的颜色应用给其他同名课程（虽然此时应该没有）
         target_color = new_course_data['color']
         for course in courses:
             if course.get('name') == new_course_data['name']:
-                course['color'] = target_color
-
+                 course['color'] = target_color
 
     courses.append(new_course_data)
-    user_data['courses'] = courses # 更新回字典
+    user_data['courses'] = courses
 
     if save_data(user_data):
-        return jsonify(new_course_data), 201 # 返回新创建的课程和 201状态码
+        return jsonify(new_course_data), 201
     else:
         return jsonify({'error': '保存课程失败'}), 500
 
-# 8. API - 修改课程 (Update)
 @app.route('/api/courses/<int:course_id>', methods=['PUT'])
 def update_course(course_id):
-    """修改指定 ID 的课程"""
     update_data = request.json
     if not update_data:
         return jsonify({'error': '缺少更新数据'}), 400
@@ -245,85 +288,57 @@ def update_course(course_id):
     if target_course is None:
         return jsonify({'error': '课程未找到'}), 404
 
-    # 更新字段
     target_course.update(update_data)
-    # 确保 ID 不变
-    target_course['id'] = course_id
+    target_course['id'] = course_id # 确保ID不变
 
-    # 颜色同步逻辑: 如果课程名称改变，则不强制同步；如果名称不变，则将此颜色应用到所有同名课程
-    if target_course.get('name') == original_name and 'color' in update_data:
-        new_color = update_data['color']
+    current_name = target_course.get('name')
+    new_color = update_data.get('color', target_course.get('color')) # 获取新颜色
+
+    # 颜色同步逻辑: 总是将当前修改的课程颜色，同步给所有同名课程
+    if current_name and new_color:
         for course in courses:
-            if course.get('name') == original_name:
+            if course.get('name') == current_name:
                 course['color'] = new_color
-    # 如果课程名称改变，检查新名称是否已有颜色，有则使用，无则使用提交的颜色
-    elif target_course.get('name') != original_name:
-        new_name = target_course.get('name')
-        existing_color_for_new_name = None
-        for course in courses:
-             # 查找其他同名课程(排除当前正在编辑的这个)
-            if course.get('name') == new_name and course.get('id') != course_id and course.get('color'):
-                existing_color_for_new_name = course.get('color')
-                break
-        if existing_color_for_new_name:
-            target_course['color'] = existing_color_for_new_name
-            # 同时更新其他同新名课程的颜色(如果它们之前颜色不同)
-            for course in courses:
-                 if course.get('name') == new_name:
-                    course['color'] = existing_color_for_new_name
-        # else: 使用 update_data 中提交的颜色(或者 target_course 中已有的)
 
-    courses[target_index] = target_course # 放回列表
-    user_data['courses'] = courses # 更新回字典
+    courses[target_index] = target_course
+    user_data['courses'] = courses
 
     if save_data(user_data):
         return jsonify(target_course)
     else:
         return jsonify({'error': '更新课程失败'}), 500
 
-# 9. API - 删除课程 (Delete)
+
 @app.route('/api/courses/<int:course_id>', methods=['DELETE'])
 def delete_course(course_id):
-    """删除指定 ID 的课程"""
     user_data = load_data()
     courses = user_data.get('courses', [])
     original_length = len(courses)
-
-    # 使用列表推导式过滤掉要删除的课程
     courses = [course for course in courses if course.get('id') != course_id]
 
     if len(courses) == original_length:
         return jsonify({'error': '课程未找到'}), 404
 
-    user_data['courses'] = courses # 更新回字典
-
+    user_data['courses'] = courses
     if save_data(user_data):
         return jsonify({'message': '课程删除成功'})
     else:
         return jsonify({'error': '删除课程失败'}), 500
 
-# 10. API - 导入课程 (Create/Replace)
 @app.route('/api/courses/import', methods=['POST'])
 def import_courses():
-    """从 JSON 数组导入课程，覆盖当前用户的所有课程"""
     imported_courses_data = request.json
     if not isinstance(imported_courses_data, list):
         return jsonify({'error': '导入数据必须是一个 JSON 数组'}), 400
 
-    user_data = load_data() # 加载现有数据(虽然会被覆盖，但为了结构一致性)
     valid_imported_courses = []
-    next_id = int(time.time() * 1000) # 起始ID
-    imported_name_color_map = {} # 用于统一导入课程的颜色
+    next_id = int(time.time() * 1000)
+    imported_name_color_map = {}
+    default_colors = ['bg-red-400', 'bg-blue-400', 'bg-green-400', 'bg-yellow-400', 'bg-purple-400', 'bg-pink-400', 'bg-indigo-400', 'bg-teal-400', 'bg-orange-400', 'bg-gray-400']
 
     for index, item in enumerate(imported_courses_data):
-        if not isinstance(item, dict):
-            print(f"Import Warning: Skipping non-dict item at index {index}")
-            continue
-
-        # 基本验证 (类似前端的 isValidCourse)
-        if not item.get('name') or not isinstance(item.get('day'), int) or not isinstance(item.get('time'), int):
-             print(f"Import Warning: Skipping item with missing/invalid basic fields at index {index}: {item}")
-             continue
+        if not isinstance(item, dict): continue
+        if not item.get('name') or not isinstance(item.get('day'), int) or not isinstance(item.get('time'), int): continue
 
         course = {
             'id': next_id,
@@ -332,19 +347,18 @@ def import_courses():
             'location': str(item.get('location', 'N/A')).strip(),
             'day': item['day'],
             'time': item['time'],
-            'color': str(item.get('color', '')).strip() # 稍后处理颜色
+            'color': str(item.get('color', '')).strip()
         }
-        next_id += 1 + random.randint(0, 9) # 增加ID
+        next_id += 1 + random.randint(0, 9)
 
-        # 颜色处理: 记录每个课程名称第一次出现的颜色
+        # 改进的验证和颜色分配
+        is_valid_color = course['color'].startswith('bg-') and len(course['color'].split('-')) > 1 and course['color'].split('-')[1].isdigit()
+
         if course['name'] not in imported_name_color_map:
-             # 如果导入的数据没提供有效颜色，则基于名字分配一个
-             default_colors = ['bg-red-400', 'bg-blue-400', 'bg-green-400', 'bg-yellow-400', 'bg-purple-400', 'bg-pink-400', 'bg-indigo-400', 'bg-teal-400', 'bg-orange-400', 'bg-gray-400']
-             valid_color = course['color'] if course['color'].startswith('bg-') and len(course['color'].split('-')) > 1 and course['color'].split('-')[1].isdigit() else default_colors[len(imported_name_color_map) % len(default_colors)]
-             imported_name_color_map[course['name']] = valid_color
-             course['color'] = valid_color
+            final_color = course['color'] if is_valid_color else default_colors[len(imported_name_color_map) % len(default_colors)]
+            imported_name_color_map[course['name']] = final_color
+            course['color'] = final_color
         else:
-            # 使用该名称记录的第一个颜色
             course['color'] = imported_name_color_map[course['name']]
 
         valid_imported_courses.append(course)
@@ -352,8 +366,8 @@ def import_courses():
     if not valid_imported_courses:
         return jsonify({'error': '导入的文件不包含有效的课程数据'}), 400
 
-    # 覆盖当前用户的课程列表
-    user_data['courses'] = valid_imported_courses
+    # 用验证和处理后的课程覆盖当前用户数据
+    user_data = {'courses': valid_imported_courses}
 
     if save_data(user_data):
         return jsonify({'message': f'成功导入 {len(valid_imported_courses)} 门课程'})
@@ -361,51 +375,42 @@ def import_courses():
         return jsonify({'error': '保存导入的课程失败'}), 500
 
 
-# 11. API - 获取诗词 (修改后)
+# --- 诗词 API (使用 session 记录状态) ---
 @app.route('/api/poetry', methods=['GET'])
 def get_poetry():
-    """
-    为当前用户随机获取一首不同的诗词。
-    会记录用户已看过的诗词索引，直到所有诗词都被看过一遍后，重新开始循环。
-    """
     if not poetryDatabase:
         return jsonify({'error': '诗词库为空'}), 500
 
-    # 尝试从 session 中获取当前用户还“未”看过的诗词的索引列表
     available_indices = session.get('available_poem_indices')
 
-    # 如果 session 中没有这个列表，或者列表为空（表示是新会话或已完成一轮）
-    if not available_indices:
-        # 初始化/重置列表，包含从 0 到 len(poetryDatabase)-1 的所有索引
+    if not available_indices: # 如果是空列表或 None
         available_indices = list(range(len(poetryDatabase)))
-        # 随机打乱这个列表的顺序，这样每次循环展示的顺序都不同
         random.shuffle(available_indices)
-        # 打印日志，方便调试
-        user_display = session.get('user_id', 'guest') # 显示用户名或guest
+        user_display = session.get('user_id', 'guest')
         print(f"用户 '{user_display}' 的诗词索引已重置/初始化。")
 
-    # 从打乱后的“可用索引列表”中取出一个索引（pop()通常比random.choice + remove效率稍高）
-    # 由于列表已打乱，pop()取出的也是随机的
-    chosen_index = available_indices.pop()
+    # 检查列表是否真的还有内容（理论上 shuffle 后重新赋值不会为空，除非诗词库为空）
+    if not available_indices:
+         # 如果意外为空，可能是并发问题或 session 问题，重新生成
+         available_indices = list(range(len(poetryDatabase)))
+         random.shuffle(available_indices)
+         print(f"警告：用户 '{session.get('user_id', 'guest')}' 的可用诗词索引意外为空，已重新生成。")
+         # 即使重新生成后，如果诗词库只有0或1首，pop 可能失败
+         if not available_indices:
+             return jsonify(poetryDatabase[0]) if poetryDatabase else jsonify({'error': '无法获取诗词'}), 500
 
-    # 根据选中的索引，从原始诗词数据库中获取诗词内容
+    chosen_index = available_indices.pop()
     poem = poetryDatabase[chosen_index]
 
-    # !!! 重要：将修改后的（移除了一个索引的）列表存回 session 中
+    # 更新 session
     session['available_poem_indices'] = available_indices
-    # 如果你是直接在session取出的列表上操作（比如用remove），可能需要下面这行
-    # session.modified = True
+    # session.modified = True # 在 Flask 中直接赋值通常不需要这句
 
-    # 打印日志，方便追踪
     user_display = session.get('user_id', 'guest')
     print(f"向用户 '{user_display}' 提供诗词索引 {chosen_index}。剩余可用: {len(available_indices)}")
 
-    # 返回选中的诗词
     return jsonify(poem)
-
 
 # --- 运行 Flask 应用 ---
 if __name__ == '__main__':
-    # debug=True 只应在开发环境中使用
-    # host='0.0.0.0' 允许局域网访问，如果只需要本机访问，用 '127.0.0.1'
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    app.run(debug=False, host='127.0.0.1', port=5000) # 生产环境建议 debug=False
