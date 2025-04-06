@@ -344,4 +344,4 @@ def get_poetry():
 if __name__ == '__main__':
     # debug=True 只应在开发环境中使用
     # host='0.0.0.0' 允许局域网访问，如果只需要本机访问，用 '127.0.0.1'
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='127.0.0.1', port=5000)
