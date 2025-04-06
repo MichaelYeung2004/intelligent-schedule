@@ -399,8 +399,8 @@
         </div>
 
         <header class="mb-10 text-center">
-            <h1 class="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 mb-3">智能课程表</h1>
-            <p class="text-lg text-gray-600">你的专属学习日程管理系统</p>
+            <h1 class="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 mb-3">云墨课栈</h1>
+            <p class="text-lg text-gray-600">轻梳你的学途时光</p>
         </header>
 
         <div class="flex flex-col lg:flex-row gap-8">
@@ -408,13 +408,13 @@
             <div class="w-full lg:w-1/4 bg-white rounded-xl shadow-lg glass-effect overflow-hidden">
                 <div class="p-6">
                     <h2 class="text-2xl font-semibold mb-6 text-gray-800 flex items-center">
-                        <i class="fas fa-sliders-h mr-3 text-indigo-500"></i>控制面板
+                        <i class="fas fa-sliders-h mr-3 text-indigo-500"></i>学迹画廊
                     </h2>
 
                     <!-- 下一门课卡片 -->
                     <div id="nextClassCard" class="next-class-card text-white mb-8 p-5 pulse">
                         <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-lg font-semibold">下一门课</h3>
+                            <h3 class="text-lg font-semibold">钟声将鸣</h3>
                             <div class="flex items-center">
                                 <i class="fas fa-clock mr-2"></i>
                                 <span id="countdown" class="countdown">--:--:--</span>
@@ -432,7 +432,7 @@
                     <div id="poetryCard" class="poetry-card mb-8 p-5 relative">
                         <div class="flex items-center justify-between mb-3">
                             <h3 class="text-lg font-semibold text-indigo-800 flex items-center">
-                                <i class="fas fa-feather-alt mr-2"></i>今日诗词
+                                <i class="fas fa-feather-alt mr-2"></i>片羽拾光
                             </h3>
                             <button id="refreshPoetry" class="poetry-refresh text-indigo-600 hover:text-indigo-800">
                                 <i class="fas fa-sync-alt"></i>
@@ -452,7 +452,7 @@
 
                     <div class="mb-8">
                         <h3 class="text-lg font-medium mb-3 text-gray-700 flex items-center">
-                            <i class="fas fa-search mr-2 text-indigo-500"></i>搜索课程
+                            <i class="fas fa-search mr-2 text-indigo-500"></i>时光检索
                         </h3>
                         <div class="relative">
                             <input type="text" id="searchInput" placeholder="输入课程名称或教师..." class="w-full px-5 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 bg-gray-50 transition-all">
@@ -462,7 +462,7 @@
 
                     <div class="mb-6">
                         <h3 class="text-lg font-medium mb-3 text-gray-700 flex items-center">
-                            <i class="fas fa-list-ul mr-2 text-indigo-500"></i>课程列表
+                            <i class="fas fa-list-ul mr-2 text-indigo-500"></i>课影集萃
                         </h3>
                         <div id="courseList" class="space-y-3 max-h-96 overflow-y-auto scrollbar-hide">
                             <!-- 课程列表将通过JS动态生成 -->
@@ -570,7 +570,7 @@
                             <select id="courseTime" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-all">
                                 <option value="1">8:00 ~ 8:45</option>
                                 <option value="2">8:55 ~ 9:40</option>
-                                <option value="3">10:10 ~ 10:50</option>
+                                <option value="3">10:10 ~ 10:55</option>
                                 <option value="4">11:05 ~ 11:50</option>
                                 <option value="5">14:20 ~ 15:05</option>
                                 <option value="6">15:15 ~ 16:00</option>
@@ -821,7 +821,7 @@
     const timeSlots = [
         { id: 1, time: '8:00 ~ 8:45', startTime: '08:00', endTime: '08:45' },
         { id: 2, time: '8:55 ~ 9:40', startTime: '08:55', endTime: '09:40' },
-        { id: 3, time: '10:10 ~ 10:50', startTime: '10:10', endTime: '10:50' },
+        { id: 3, time: '10:10 ~ 10:55', startTime: '10:10', endTime: '10:55' },
         { id: 4, time: '11:05 ~ 11:50', startTime: '11:05', endTime: '11:50' },
         { id: 5, time: '14:20 ~ 15:05', startTime: '14:20', endTime: '15:05' },
         { id: 6, time: '15:15 ~ 16:00', startTime: '15:15', endTime: '16:00' },
