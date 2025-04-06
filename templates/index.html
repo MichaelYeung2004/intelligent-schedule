@@ -1,0 +1,2220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能课程表管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    <style>
+        /* General Styles */
+        .time-slot {
+            height: 70px;
+        }
+        .course-card {
+            transition: all 0.3s ease;
+            height: 100%; /* Ensure card takes full height */
+            /* display: flex; */ /* Let flex below handle it */
+            /* flex-direction: column; */
+            /* justify-content: center; */
+        }
+        .course-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .color-picker {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        .color-picker:hover {
+            transform: scale(1.15);
+            border-color: rgba(0,0,0,0.2);
+        }
+        .modal {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .modal-hidden {
+            opacity: 0;
+            transform: translateY(10px);
+            pointer-events: none;
+        }
+        .current-day {
+            background-color: #f0f7ff;
+            position: relative;
+        }
+        .current-day::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+        }
+        .day-header {
+            transition: all 0.3s ease;
+        }
+        .day-header:hover {
+            background-color: #f8fafc;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .glass-effect {
+            backdrop-filter: blur(8px);
+            background-color: rgba(255, 255, 255, 0.85);
+        }
+        .week-header {
+            background-color: #e0f2fe;
+        }
+        td:hover {
+            background-color: #fce7f3 !important;
+        }
+        .selected-day {
+            background-color: #3b82f6 !important;
+            color: white !important;
+        }
+        .user-dropdown {
+            transition: all 0.3s ease;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+        }
+        .user-dropdown.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        .file-input-label {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            background-color: #f3f4f6;
+            color: #374151;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .file-input-label:hover {
+            background-color: #e5e7eb;
+        }
+        .file-input {
+            display: none;
+        }
+        .next-class-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+        }
+        .next-class-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+            transform: rotate(30deg);
+            z-index: -1;
+            animation: shine 6s infinite linear;
+        }
+        @keyframes shine {
+            0% { transform: translateX(-100%) rotate(30deg); }
+            100% { transform: translateX(100%) rotate(30deg); }
+        }
+        .countdown {
+            font-feature-settings: "tnum";
+            font-variant-numeric: tabular-nums;
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Pomodoro Styles */
+        .pomodoro-container {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+        .pomodoro-toggle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f43f5e, #ec4899);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(244, 63, 94, 0.3);
+            transition: all 0.3s ease;
+        }
+        .pomodoro-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(244, 63, 94, 0.4);
+        }
+        .pomodoro-panel {
+            width: 280px;
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            display: none;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s ease;
+            position: absolute;
+            bottom: 70px;
+            right: 0;
+        }
+        .pomodoro-panel.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .pomodoro-timer {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 20px;
+            position: relative;
+        }
+        .pomodoro-circle {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        .pomodoro-progress {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform: rotate(-90deg);
+        }
+        .pomodoro-progress circle {
+            transition: stroke-dashoffset 1s linear;
+        }
+        .pomodoro-time {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            font-weight: bold;
+            color: #1e293b;
+        }
+        .pomodoro-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .pomodoro-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f1f5f9;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .pomodoro-btn:hover {
+            background: #e2e8f0;
+            color: #475569;
+        }
+        .pomodoro-btn-primary {
+            width: 120px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, #f43f5e, #ec4899);
+            color: white;
+            font-weight: 500;
+        }
+        .pomodoro-btn-primary:hover {
+            background: linear-gradient(135deg, #e11d48, #db2777);
+        }
+        .pomodoro-settings {
+            margin-top: 15px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
+            display: none;
+        }
+        .pomodoro-setting-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .pomodoro-setting-label {
+            font-size: 14px;
+            color: #64748b;
+        }
+        .pomodoro-setting-input {
+            width: 60px;
+            padding: 5px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .pomodoro-mode {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+        .pomodoro-mode-btn {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            background: #f1f5f9;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .pomodoro-mode-btn.active {
+            background: linear-gradient(135deg, #f43f5e, #ec4899);
+            color: white;
+        }
+        .pomodoro-status {
+            text-align: center;
+            font-size: 14px;
+            color: #64748b;
+            margin-bottom: 10px;
+            min-height: 20px;
+        }
+
+        /* Poetry Card Styles */
+        .poetry-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+        }
+        .poetry-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(225, 245, 254, 0.6) 0%, rgba(255, 224, 230, 0.6) 100%); /* Adjusted gradient */
+            z-index: -1;
+        }
+        .poetry-text {
+            font-family: "SimSun", "STKaiti", serif; /* Common Chinese Serif Fonts */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
+            line-height: 1.7; /* Increased line height for readability */
+            font-size: 1.1rem; /* Slightly larger base font */
+        }
+        .poetry-author {
+            font-family: "KaiTi", "STKaiti", serif; /* KaiTi font */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
+        }
+        .poetry-refresh {
+            transition: transform 0.5s ease; /* Smoother rotation */
+        }
+        .poetry-refresh:hover {
+            transform: rotate(180deg); /* Rotate 180 deg on hover */
+        }
+        .poetry-refresh.loading {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-50 to-purple-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- 顶部导航栏 -->
+        <div class="flex justify-between items-center mb-6">
+            <div class="text-indigo-600 font-medium">
+                <i class="fas fa-calendar-day mr-2"></i>
+                <span id="current-date"></span>
+            </div>
+
+            <!-- 用户登录/注册区域 -->
+            <div class="relative">
+                <!-- 未登录状态 -->
+                <div id="userNotLoggedIn" class="flex items-center space-x-3">
+                    <button id="loginBtn" class="px-4 py-2 text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
+                        <i class="fas fa-sign-in-alt mr-2"></i>登录
+                    </button>
+                    <button id="registerBtn" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all shadow-md">
+                        <i class="fas fa-user-plus mr-2"></i>注册
+                    </button>
+                </div>
+
+                <!-- 已登录状态 -->
+                <div id="userLoggedIn" class="hidden flex items-center space-x-3">
+                    <div class="relative">
+                        <button id="userMenuBtn" class="flex items-center space-x-2 group">
+                            <div class="w-9 h-9 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white font-medium">
+                                <span id="userInitial">U</span>
+                            </div>
+                            <span id="username" class="font-medium text-gray-700 group-hover:text-indigo-600 transition-colors">用户名</span>
+                            <i class="fas fa-chevron-down text-xs text-gray-500 group-hover:text-indigo-600 transition-colors"></i>
+                        </button>
+
+                        <div id="userDropdown" class="user-dropdown absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl z-50 overflow-hidden">
+                            <div class="py-1">
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
+                                    <i class="fas fa-user mr-2"></i>个人资料
+                                </a>
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
+                                    <i class="fas fa-cog mr-2"></i>设置
+                                </a>
+                                <div class="border-t border-gray-200"></div>
+                                <button id="logoutBtn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
+                                    <i class="fas fa-sign-out-alt mr-2"></i>退出登录
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <header class="mb-10 text-center">
+            <h1 class="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 mb-3">智能课程表</h1>
+            <p class="text-lg text-gray-600">你的专属学习日程管理系统</p>
+        </header>
+
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- 左侧控制面板 -->
+            <div class="w-full lg:w-1/4 bg-white rounded-xl shadow-lg glass-effect overflow-hidden">
+                <div class="p-6">
+                    <h2 class="text-2xl font-semibold mb-6 text-gray-800 flex items-center">
+                        <i class="fas fa-sliders-h mr-3 text-indigo-500"></i>控制面板
+                    </h2>
+
+                    <!-- 下一门课卡片 -->
+                    <div id="nextClassCard" class="next-class-card text-white mb-8 p-5 pulse">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold">下一门课</h3>
+                            <div class="flex items-center">
+                                <i class="fas fa-clock mr-2"></i>
+                                <span id="countdown" class="countdown">--:--:--</span>
+                            </div>
+                        </div>
+                        <div id="nextClassInfo">
+                            <div class="text-sm opacity-80 mb-1">暂无即将开始的课程</div>
+                            <div class="h-2 w-full bg-white bg-opacity-20 rounded-full overflow-hidden">
+                                <div id="progressBar" class="h-full bg-white transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 新增诗词卡片 -->
+                    <div id="poetryCard" class="poetry-card mb-8 p-5 relative">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold text-indigo-800 flex items-center">
+                                <i class="fas fa-feather-alt mr-2"></i>今日诗词
+                            </h3>
+                            <button id="refreshPoetry" class="poetry-refresh text-indigo-600 hover:text-indigo-800">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                        <div id="poetryContent" class="text-center min-h-[60px]"> <!-- Added min-height -->
+                            <p class="poetry-text text-gray-800 mb-2">正在加载诗词...</p>
+                            <p class="poetry-author text-sm text-gray-600 italic"></p>
+                        </div>
+                    </div>
+
+                    <div class="mb-8">
+                        <button id="addCourseBtn" class="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white py-3 px-6 rounded-xl flex items-center justify-center gap-3 shadow-md hover:shadow-lg transition-all">
+                            <i class="fas fa-plus-circle"></i> 添加新课程
+                        </button>
+                    </div>
+
+                    <div class="mb-8">
+                        <h3 class="text-lg font-medium mb-3 text-gray-700 flex items-center">
+                            <i class="fas fa-search mr-2 text-indigo-500"></i>搜索课程
+                        </h3>
+                        <div class="relative">
+                            <input type="text" id="searchInput" placeholder="输入课程名称或教师..." class="w-full px-5 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 bg-gray-50 transition-all">
+                            <i class="fas fa-search absolute right-4 top-3.5 text-gray-400"></i>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <h3 class="text-lg font-medium mb-3 text-gray-700 flex items-center">
+                            <i class="fas fa-list-ul mr-2 text-indigo-500"></i>课程列表
+                        </h3>
+                        <div id="courseList" class="space-y-3 max-h-96 overflow-y-auto scrollbar-hide">
+                            <!-- 课程列表将通过JS动态生成 -->
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <h3 class="text-lg font-medium mb-3 text-gray-700 flex items-center">
+                            <i class="fas fa-file-import mr-2 text-indigo-500"></i>导入/导出
+                        </h3>
+                        <div class="space-y-3">
+                            <button id="exportJsonBtn" class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors">
+                                <i class="fas fa-file-code"></i> 导出为JSON
+                            </button>
+                            <button id="exportExcelBtn" class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors">
+                                <i class="fas fa-file-excel"></i> 导出为Excel
+                            </button>
+                            <label for="importFile" class="file-input-label w-full flex items-center justify-center gap-2 cursor-pointer">
+                                <i class="fas fa-file-import"></i> 导入课程表
+                                <input type="file" id="importFile" class="file-input" accept=".json,.xlsx,.xls">
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-indigo-50 p-4 border-t border-indigo-100">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 pt-1">
+                            <i class="fas fa-info-circle text-indigo-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-indigo-700">
+                                提示：点击课程可查看详情或编辑，同一课程自动使用相同颜色
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧课程表 -->
+            <div class="w-full lg:w-3/4 bg-white rounded-xl shadow-lg overflow-hidden glass-effect">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="week-header">
+                                <th class="w-28 py-4 text-center font-medium text-gray-700">时间</th>
+                                <th class="py-4 text-center font-medium day-header" data-day="1">周一</th>
+                                <th class="py-4 text-center font-medium day-header" data-day="2">周二</th>
+                                <th class="py-4 text-center font-medium day-header" data-day="3">周三</th>
+                                <th class="py-4 text-center font-medium day-header" data-day="4">周四</th>
+                                <th class="py-4 text-center font-medium day-header" data-day="5">周五</th>
+                                <th class="py-4 text-center font-medium day-header" data-day="6">周六</th>
+                                <th class="py-4 text-center font-medium day-header" data-day="7">周日</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scheduleBody">
+                            <!-- 课程表内容将通过JS动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加/编辑课程模态框 -->
+    <div id="courseModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 modal-hidden">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="px-6 py-5 bg-gradient-to-r from-indigo-500 to-purple-500">
+                <h3 id="modalTitle" class="text-xl font-semibold text-white">添加新课程</h3>
+            </div>
+
+            <div class="px-6 py-5">
+                <div class="mb-5">
+                    <label for="courseName" class="block text-sm font-medium text-gray-700 mb-2">课程名称</label>
+                    <input type="text" id="courseName" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-all">
+                </div>
+
+                <div class="mb-5">
+                    <label for="courseTeacher" class="block text-sm font-medium text-gray-700 mb-2">授课教师</label>
+                    <input type="text" id="courseTeacher" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-all">
+                </div>
+
+                <div class="mb-5">
+                    <label for="courseLocation" class="block text-sm font-medium text-gray-700 mb-2">上课地点</label>
+                    <input type="text" id="courseLocation" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-all">
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-sm font-medium text-gray-700 mb-3">上课时间</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">星期</label>
+                            <select id="courseDay" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-all">
+                                <option value="1">周一</option>
+                                <option value="2">周二</option>
+                                <option value="3">周三</option>
+                                <option value="4">周四</option>
+                                <option value="5">周五</option>
+                                <option value="6">周六</option>
+                                <option value="7">周日</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">时间段</label>
+                            <select id="courseTime" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-all">
+                                <option value="1">8:00 ~ 8:45</option>
+                                <option value="2">8:55 ~ 9:40</option>
+                                <option value="3">10:10 ~ 10:50</option>
+                                <option value="4">11:05 ~ 11:50</option>
+                                <option value="5">14:20 ~ 15:05</option>
+                                <option value="6">15:15 ~ 16:00</option>
+                                <option value="7">16:30 ~ 17:15</option>
+                                <option value="8">17:25 ~ 18:10</option>
+                                <option value="9">19:00 ~ 19:45</option>
+                                <option value="10">19:55 ~ 20:40</option>
+                                <option value="11">20:50 ~ 21:35</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-sm font-medium text-gray-700 mb-3">课程颜色</label>
+                    <div class="flex flex-wrap gap-3">
+                        <div class="color-picker bg-red-400" data-color="bg-red-400"></div>
+                        <div class="color-picker bg-blue-400" data-color="bg-blue-400"></div>
+                        <div class="color-picker bg-green-400" data-color="bg-green-400"></div>
+                        <div class="color-picker bg-yellow-400" data-color="bg-yellow-400"></div>
+                        <div class="color-picker bg-purple-400" data-color="bg-purple-400"></div>
+                        <div class="color-picker bg-pink-400" data-color="bg-pink-400"></div>
+                        <div class="color-picker bg-indigo-400" data-color="bg-indigo-400"></div>
+                        <div class="color-picker bg-teal-400" data-color="bg-teal-400"></div>
+                        <div class="color-picker bg-orange-400" data-color="bg-orange-400"></div>
+                        <div class="color-picker bg-gray-400" data-color="bg-gray-400"></div>
+                    </div>
+                    <input type="hidden" id="courseColor" value="bg-indigo-400"> <!-- Default color -->
+                </div>
+            </div>
+
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button id="cancelBtn" class="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all">取消</button>
+                <button id="saveBtn" class="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all shadow-md">保存</button>
+                <button id="deleteBtn" class="px-5 py-2.5 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg hover:from-red-600 hover:to-pink-600 transition-all shadow-md hidden">删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 课程详情模态框 -->
+    <div id="detailModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 modal-hidden">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="px-6 py-5 bg-gradient-to-r from-indigo-500 to-purple-500 flex justify-between items-center">
+                <h3 id="detailTitle" class="text-xl font-semibold text-white">课程详情</h3>
+                <button id="editBtn" class="text-white hover:text-indigo-200 transition-colors">
+                    <i class="fas fa-edit mr-1"></i> 编辑
+                </button>
+            </div>
+
+            <div class="px-6 py-5">
+                <div class="mb-5">
+                    <p class="text-sm text-gray-500 mb-1">课程名称</p>
+                    <p id="detailName" class="text-lg font-medium"></p>
+                </div>
+
+                <div class="mb-5">
+                    <p class="text-sm text-gray-500 mb-1">授课教师</p>
+                    <p id="detailTeacher" class="text-lg"></p>
+                </div>
+
+                <div class="mb-5">
+                    <p class="text-sm text-gray-500 mb-1">上课地点</p>
+                    <p id="detailLocation" class="text-lg"></p>
+                </div>
+
+                <div class="mb-5">
+                    <p class="text-sm text-gray-500 mb-1">上课时间</p>
+                    <p id="detailTime" class="text-lg"></p>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-gray-200">
+                    <div class="flex items-center">
+                        <span class="text-sm text-gray-500 mr-3">课程颜色:</span>
+                        <span id="detailColor" class="w-6 h-6 rounded-full inline-block"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
+                <button id="closeDetailBtn" class="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all shadow-md">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 登录模态框 -->
+    <div id="loginModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 modal-hidden">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="px-6 py-5 bg-gradient-to-r from-indigo-500 to-purple-500">
+                <h3 class="text-xl font-semibold text-white">用户登录</h3>
+            </div>
+
+            <div class="px-6 py-5">
+                <div class="mb-5">
+                    <label for="loginUsername" class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
+                    <input type="text" id="loginUsername" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-all" placeholder="请输入用户名">
+            </div>
+
+            <div class="mb-5">
+                <label for="loginPassword" class="block text-sm font-medium text-gray-700 mb-2">密码</label>
+                <input type="password" id="loginPassword" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-all" placeholder="请输入密码">
+            </div>
+
+            <div class="flex items-center justify-between mb-5">
+                <div class="flex items-center">
+                    <input type="checkbox" id="rememberMe" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                    <label for="rememberMe" class="ml-2 block text-sm text-gray-700">记住我</label>
+                </div>
+                <a href="#" class="text-sm text-indigo-600 hover:text-indigo-800">忘记密码?</a>
+            </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-between">
+            <button id="loginCancelBtn" class="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all">取消</button>
+            <button id="loginSubmitBtn" class="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all shadow-md">登录</button>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-200 text-center text-sm text-gray-600">
+            还没有账号? <button id="switchToRegister" class="text-indigo-600 hover:text-indigo-800 font-medium">立即注册</button>
+        </div>
+    </div>
+</div>
+
+<!-- 注册模态框 -->
+<div id="registerModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 modal-hidden">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+        <div class="px-6 py-5 bg-gradient-to-r from-indigo-500 to-purple-500">
+            <h3 class="text-xl font-semibold text-white">用户注册</h3>
+        </div>
+
+        <div class="px-6 py-5">
+            <div class="mb-5">
+                <label for="registerUsername" class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
+                <input type="text" id="registerUsername" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-all" placeholder="请输入用户名">
+            </div>
+
+            <div class="mb-5">
+                <label for="registerEmail" class="block text-sm font-medium text-gray-700 mb-2">电子邮箱</label>
+                <input type="email" id="registerEmail" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-all" placeholder="请输入电子邮箱">
+            </div>
+
+            <div class="mb-5">
+                <label for="registerPassword" class="block text-sm font-medium text-gray-700 mb-2">密码</label>
+                <input type="password" id="registerPassword" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-all" placeholder="请输入密码(至少6位)">
+            </div>
+
+            <div class="mb-5">
+                <label for="registerConfirmPassword" class="block text-sm font-medium text-gray-700 mb-2">确认密码</label>
+                <input type="password" id="registerConfirmPassword" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-all" placeholder="请再次输入密码">
+            </div>
+
+            <div class="flex items-center">
+                <input type="checkbox" id="agreeTerms" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                <label for="agreeTerms" class="ml-2 block text-sm text-gray-700">我已阅读并同意<a href="#" class="text-indigo-600 hover:text-indigo-800">服务条款</a></label>
+            </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-between">
+            <button id="registerCancelBtn" class="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all">取消</button>
+            <button id="registerSubmitBtn" class="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all shadow-md">注册</button>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-200 text-center text-sm text-gray-600">
+            已有账号? <button id="switchToLogin" class="text-indigo-600 hover:text-indigo-800 font-medium">立即登录</button>
+        </div>
+    </div>
+</div>
+
+<!-- 导入确认模态框 -->
+<div id="importConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 modal-hidden">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+        <div class="px-6 py-5 bg-gradient-to-r from-indigo-500 to-purple-500">
+            <h3 class="text-xl font-semibold text-white">导入确认</h3>
+        </div>
+
+        <div class="px-6 py-5">
+            <p class="text-gray-700 mb-4">即将导入 <span id="importCourseCount" class="font-semibold">0</span> 门课程，这将<strong class="text-red-600">覆盖</strong>您当前的课程表。</p>
+            <p class="text-sm text-gray-500">请确认是否继续？</p>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+            <button id="importCancelBtn" class="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all">取消</button>
+            <button id="importConfirmBtn" class="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all shadow-md">确认导入</button>
+        </div>
+    </div>
+</div>
+
+    <!-- 番茄钟容器 (Purely Frontend - Kept as is) -->
+    <div class="pomodoro-container">
+        <div class="pomodoro-toggle" id="pomodoroToggle">
+            <i class="fas fa-clock"></i>
+        </div>
+        <div class="pomodoro-panel" id="pomodoroPanel">
+            <!-- Pomodoro content remains the same -->
+            <div class="pomodoro-status" id="pomodoroStatus"></div>
+            <div class="pomodoro-mode">
+                <div class="pomodoro-mode-btn active" data-mode="work">工作</div>
+                <div class="pomodoro-mode-btn" data-mode="shortBreak">短休</div>
+                <div class="pomodoro-mode-btn" data-mode="longBreak">长休</div>
+            </div>
+            <div class="pomodoro-timer">
+                <div class="pomodoro-circle">
+                    <svg class="pomodoro-progress" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="#e2e8f0" stroke-width="8"></circle>
+                        <circle id="progressCircle" cx="50" cy="50" r="45" fill="none" stroke="#f43f5e" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283"></circle> <!-- Start with full offset -->
+                    </svg>
+                    <div class="pomodoro-time" id="pomodoroTime">25:00</div>
+                </div>
+            </div>
+            <div class="pomodoro-controls">
+                <div class="pomodoro-btn" id="resetBtn" title="重置">
+                    <i class="fas fa-redo"></i>
+                </div>
+                <div class="pomodoro-btn pomodoro-btn-primary" id="startBtn">
+                    <span>开始</span>
+                </div>
+                <div class="pomodoro-btn" id="settingsBtn" title="设置">
+                    <i class="fas fa-cog"></i>
+                </div>
+            </div>
+            <div class="pomodoro-settings" id="pomodoroSettings">
+                <div class="pomodoro-setting-item">
+                    <span class="pomodoro-setting-label">工作时间 (分钟)</span>
+                    <input type="number" min="1" max="60" class="pomodoro-setting-input" id="workTimeInput" value="25">
+                </div>
+                <div class="pomodoro-setting-item">
+                    <span class="pomodoro-setting-label">短休时间 (分钟)</span>
+                    <input type="number" min="1" max="30" class="pomodoro-setting-input" id="shortBreakInput" value="5">
+                </div>
+                <div class="pomodoro-setting-item">
+                    <span class="pomodoro-setting-label">长休时间 (分钟)</span>
+                    <input type="number" min="1" max="60" class="pomodoro-setting-input" id="longBreakInput" value="15">
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // ==========================================
+    //  GLOBAL VARIABLES & CONFIG
+    // ==========================================
+    let courses = []; // Data now comes from backend
+    let editingCourseId = null;
+    let selectedColor = 'bg-indigo-400'; // Default color for new courses unless overridden
+    let importCoursesData = []; // Holds data parsed from imported file before sending to backend
+    let currentUser = null; // Holds current user info { username, initial }
+
+    // --- Constants (remain the same) ---
+    const timeSlots = [
+        { id: 1, time: '8:00 ~ 8:45', startTime: '08:00', endTime: '08:45' },
+        { id: 2, time: '8:55 ~ 9:40', startTime: '08:55', endTime: '09:40' },
+        { id: 3, time: '10:10 ~ 10:50', startTime: '10:10', endTime: '10:50' },
+        { id: 4, time: '11:05 ~ 11:50', startTime: '11:05', endTime: '11:50' },
+        { id: 5, time: '14:20 ~ 15:05', startTime: '14:20', endTime: '15:05' },
+        { id: 6, time: '15:15 ~ 16:00', startTime: '15:15', endTime: '16:00' },
+        { id: 7, time: '16:30 ~ 17:15', startTime: '16:30', endTime: '17:15' },
+        { id: 8, time: '17:25 ~ 18:10', startTime: '17:25', endTime: '18:10' },
+        { id: 9, time: '19:00 ~ 19:45', startTime: '19:00', endTime: '19:45' },
+        { id: 10, time: '19:55 ~ 20:40', startTime: '19:55', endTime: '20:40' },
+        { id: 11, time: '20:50 ~ 21:35', startTime: '20:50', endTime: '21:35' }
+    ];
+    const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    // Poetry database removed, fetched from backend now
+    // const poetryDatabase = [ ... ];
+
+    // ==========================================
+    //  DOM ELEMENT REFERENCES (remain the same)
+    // ==========================================
+    // Schedule related
+    const scheduleBody = document.getElementById('scheduleBody');
+    const courseList = document.getElementById('courseList');
+    const searchInput = document.getElementById('searchInput');
+    const addCourseBtn = document.getElementById('addCourseBtn');
+    const courseModal = document.getElementById('courseModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const saveBtn = document.getElementById('saveBtn');
+    const deleteBtn = document.getElementById('deleteBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const detailModal = document.getElementById('detailModal');
+    const closeDetailBtn = document.getElementById('closeDetailBtn');
+    const editBtn = document.getElementById('editBtn');
+    const currentDateElement = document.getElementById('current-date');
+    const exportJsonBtn = document.getElementById('exportJsonBtn');
+    const exportExcelBtn = document.getElementById('exportExcelBtn');
+    const importFileInput = document.getElementById('importFile');
+    const importConfirmModal = document.getElementById('importConfirmModal');
+    const importCancelBtn = document.getElementById('importCancelBtn');
+    const importConfirmBtn = document.getElementById('importConfirmBtn');
+    const importCourseCount = document.getElementById('importCourseCount');
+    const nextClassInfo = document.getElementById('nextClassInfo');
+    const countdownElement = document.getElementById('countdown');
+    const nextClassCard = document.getElementById('nextClassCard');
+
+    // User related
+    const userNotLoggedIn = document.getElementById('userNotLoggedIn');
+    const userLoggedIn = document.getElementById('userLoggedIn');
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
+    const userMenuBtn = document.getElementById('userMenuBtn');
+    const userDropdown = document.getElementById('userDropdown');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const usernameElement = document.getElementById('username');
+    const userInitialElement = document.getElementById('userInitial');
+    const loginModal = document.getElementById('loginModal');
+    const registerModal = document.getElementById('registerModal');
+    const loginCancelBtn = document.getElementById('loginCancelBtn');
+    const loginSubmitBtn = document.getElementById('loginSubmitBtn');
+    const registerCancelBtn = document.getElementById('registerCancelBtn');
+    const registerSubmitBtn = document.getElementById('registerSubmitBtn');
+    const switchToRegister = document.getElementById('switchToRegister');
+    const switchToLogin = document.getElementById('switchToLogin');
+
+    // Poetry related
+    const poetryContent = document.getElementById('poetryContent');
+    const refreshPoetryBtn = document.getElementById('refreshPoetry');
+    const poetryTextEl = poetryContent.querySelector('.poetry-text');
+    const poetryAuthorEl = poetryContent.querySelector('.poetry-author');
+
+    // ==========================================
+    //  HELPER FUNCTIONS (most remain the same)
+    // ==========================================
+    function getCurrentDay() {
+        const day = new Date().getDay(); return day === 0 ? 7 : day;
+    }
+    function formatCurrentDate() {
+        const now = new Date(); const year = now.getFullYear(); const month = now.getMonth() + 1; const date = now.getDate(); const dayName = days[getCurrentDay() - 1];
+        return `${year}年${month}月${date}日 ${dayName}`;
+    }
+    function getCurrentTime() {
+        const now = new Date(); const hours = now.getHours().toString().padStart(2, '0'); const minutes = now.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+    }
+
+    // REMOVED: saveCoursesToLocalStorage()
+
+    // Helper for assigning colors (can still be useful for frontend defaults or import)
+    function getOrAssignColor(courseName) {
+        // Check existing courses *in the current frontend array* for the name
+        const existingCourse = courses.find(c => c.name === courseName);
+        if (existingCourse && existingCourse.color) return existingCourse.color;
+
+        // Fallback color logic if no existing course with that name found locally
+        const colors = ['bg-red-400', 'bg-blue-400', 'bg-green-400', 'bg-yellow-400', 'bg-purple-400', 'bg-pink-400', 'bg-indigo-400', 'bg-teal-400', 'bg-orange-400', 'bg-gray-400'];
+        // Use a simple hash or count of unique names currently loaded to pick a color index
+        const uniqueNames = new Set(courses.map(c => c.name));
+        return colors[uniqueNames.size % colors.length] || 'bg-gray-400';
+    }
+    // Validation function for imported data (remains useful)
+    function isValidCourse(item, index) {
+        if (!item || typeof item !== 'object') { console.warn(`Import warning (row ${index + 2}): Invalid item structure.`); return false; }
+        if (!item.name || typeof item.name !== 'string' || item.name.trim() === '') { console.warn(`Import warning (row ${index + 2}): Missing or invalid '课程名称'.`); return false; }
+        // Ensure day and time are numbers after potential parsing
+        if (typeof item.day !== 'number' || item.day < 1 || item.day > 7) { console.warn(`Import warning for "${item.name}" (row ${index + 2}): Invalid or missing '星期' number (${item.day}).`); return false; }
+        const timeSlot = timeSlots.find(t => t.id === item.time); if (!timeSlot) { console.warn(`Import warning for "${item.name}" (row ${index + 2}): Invalid or missing '时间段' ID (${item.time}).`); return false; }
+        // Make teacher/location strings if not already
+        if (typeof item.teacher !== 'string') item.teacher = item.teacher?.toString() || 'N/A';
+        if (typeof item.location !== 'string') item.location = item.location?.toString() || 'N/A';
+        // Check color format loosely (can be refined)
+        const validColorClasses = ['bg-red-400', 'bg-blue-400', 'bg-green-400', 'bg-yellow-400', 'bg-purple-400', 'bg-pink-400', 'bg-indigo-400', 'bg-teal-400', 'bg-orange-400', 'bg-gray-400'];
+        if (typeof item.color !== 'string' || !validColorClasses.includes(item.color)) {
+            console.warn(`Import warning for "${item.name}" (row ${index + 2}): Invalid or missing color "${item.color}". Will assign later.`);
+            // Backend will handle color assignment if needed, but good to note here
+            item.color = null; // Mark for potential assignment
+        }
+        return true;
+    }
+
+    // ==========================================
+    //  COURSE SCHEDULE CORE LOGIC (Rendering logic remains mostly the same)
+    // ==========================================
+
+    function initSchedule() {
+        // This function structure remains the same, it builds the empty table grid
+        scheduleBody.innerHTML = '';
+        const currentDayVal = getCurrentDay(); // Renamed to avoid conflict
+        timeSlots.forEach(slot => {
+            const row = document.createElement('tr');
+            row.className = 'border-b border-gray-200 hover:bg-gray-50 transition-colors';
+            const timeCell = document.createElement('td');
+            timeCell.className = 'time-slot px-4 py-3 text-center text-sm text-gray-500 font-medium';
+            timeCell.textContent = slot.time;
+            row.appendChild(timeCell);
+            for (let i = 1; i <= 7; i++) {
+                const dayCell = document.createElement('td');
+                // Use currentDayVal here
+                dayCell.className = `time-slot border-l border-gray-200 relative ${i === currentDayVal ? 'current-day' : ''}`;
+                dayCell.dataset.day = i; dayCell.dataset.time = slot.id;
+                const cardContainer = document.createElement('div');
+                cardContainer.className = 'absolute inset-0';
+                cardContainer.id = `cell-${i}-${slot.id}`; // Unique ID for the cell content area
+                dayCell.appendChild(cardContainer);
+                row.appendChild(dayCell);
+            }
+            scheduleBody.appendChild(row);
+        });
+
+        // Highlight current day header (remains the same)
+        const dayHeaders = document.querySelectorAll('.day-header');
+        dayHeaders.forEach(header => {
+             header.classList.remove('selected-day');
+             const dayIndex = parseInt(header.dataset.day);
+             const dayName = days[dayIndex - 1];
+             header.textContent = dayName; // Reset content first
+             if (dayIndex === currentDayVal) {
+                 header.classList.add('selected-day');
+                 // Add pulse effect or just highlight
+                 header.innerHTML = `<span class="relative">${dayName} <span class="absolute -top-1 -right-2 w-2 h-2 bg-white rounded-full animate-pulse"></span></span>`;
+             }
+        });
+
+        // Update current date display (remains the same)
+        currentDateElement.textContent = formatCurrentDate();
+    }
+
+
+    function renderCoursesToSchedule() {
+        // Clear existing course cards
+        document.querySelectorAll('[id^="cell-"]').forEach(cellContentArea => {
+            cellContentArea.innerHTML = '';
+        });
+
+        // Render courses from the global `courses` array (now populated from backend)
+        courses.forEach(course => {
+            const cellContentArea = document.getElementById(`cell-${course.day}-${course.time}`);
+            if (cellContentArea) {
+                const card = document.createElement('div');
+                card.className = `course-card ${course.color || 'bg-gray-400'} text-white rounded-none cursor-pointer text-center overflow-hidden flex flex-col justify-center`;
+                card.style.fontSize = '13px'; // Font size setting remains
+                card.innerHTML = `
+                    <div class="font-medium truncate leading-tight px-1">${course.name}</div>
+                    <div class="opacity-90 truncate leading-tight px-1">${course.teacher || 'N/A'}</div>
+                    <div class="opacity-80 truncate leading-tight px-1">${course.location || 'N/A'}</div>
+                `;
+                // Add event listener to show details on click
+                card.addEventListener('click', () => showCourseDetail(course.id));
+                cellContentArea.appendChild(card);
+            } else {
+                console.warn(`Could not find cell for course: ${course.name} on day ${course.day} time ${course.time}`);
+            }
+        });
+        // Update next class info after rendering
+        updateNextClassInfo();
+    }
+
+    function renderCourseList(filter = '') {
+        // This function structure remains the same, operating on the global `courses` array
+        courseList.innerHTML = '';
+        const lowerCaseFilter = filter.toLowerCase();
+        const filteredCourses = courses.filter(course =>
+            (course.name && course.name.toLowerCase().includes(lowerCaseFilter)) ||
+            (course.teacher && course.teacher.toLowerCase().includes(lowerCaseFilter))
+        );
+
+        if (filteredCourses.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'text-center text-gray-500 py-4';
+            emptyMsg.textContent = filter ? '没有找到相关课程' : '暂无课程，点击上方按钮添加';
+            courseList.appendChild(emptyMsg);
+            return;
+        }
+
+        // Group courses by name (logic remains the same)
+        const courseGroups = {};
+        filteredCourses.forEach(course => {
+            const groupKey = course.name || 'Unnamed Course'; // Handle potential missing name
+            if (!courseGroups[groupKey]) {
+                // Use the color from the first instance found, or a default
+                courseGroups[groupKey] = { name: groupKey, color: course.color || 'bg-gray-400', instances: [] };
+            }
+            // Ensure group color consistency if later instances have different colors in the raw data
+            if (!courseGroups[groupKey].color || courseGroups[groupKey].color === 'bg-gray-400') {
+                 courseGroups[groupKey].color = course.color || 'bg-gray-400';
+            }
+            courseGroups[groupKey].instances.push(course);
+        });
+
+        // Sort and render groups (logic remains the same)
+        const sortedGroupKeys = Object.keys(courseGroups).sort((a, b) => a.localeCompare(b));
+        sortedGroupKeys.forEach(groupKey => {
+            const group = courseGroups[groupKey];
+            const groupItem = document.createElement('div');
+            groupItem.className = 'border border-gray-200 rounded-xl overflow-hidden mb-3 last:mb-0';
+
+            const header = document.createElement('div');
+            // Apply group color to header
+            header.className = `flex items-center justify-between p-3 ${group.color} text-white cursor-pointer transition-colors`;
+
+            const headerContent = document.createElement('div');
+            headerContent.className = 'flex-grow flex items-center justify-between mr-2';
+            headerContent.innerHTML = `
+                <span class="font-medium truncate">${group.name}</span>
+                <span class="text-xs bg-white bg-opacity-20 px-2 py-1 rounded-full flex-shrink-0">${group.instances.length}节</span>
+            `;
+
+            const toggleIcon = document.createElement('i');
+            toggleIcon.className = 'toggle-icon fas fa-chevron-down text-white/80 flex-shrink-0';
+
+            header.appendChild(headerContent);
+            header.appendChild(toggleIcon);
+
+            // Toggle content visibility on header click
+            header.addEventListener('click', () => {
+                const content = groupItem.querySelector('.course-content');
+                content.classList.toggle('hidden');
+                const icon = groupItem.querySelector('.toggle-icon');
+                icon.classList.toggle('fa-chevron-down');
+                icon.classList.toggle('fa-chevron-up');
+            });
+
+            const content = document.createElement('div');
+            content.className = 'course-content bg-gray-50 hidden transition-all'; // Start hidden
+
+            // Sort instances within the group by day and time
+            group.instances.sort((a, b) => {
+                if (a.day !== b.day) return a.day - b.day;
+                return a.time - b.time;
+            });
+
+            // Render individual course instances within the group
+            group.instances.forEach(course => {
+                const courseItem = document.createElement('div');
+                courseItem.className = 'p-3 border-t border-gray-200 hover:bg-gray-100 cursor-pointer flex justify-between items-center transition-colors';
+                const timeSlot = timeSlots.find(t => t.id === course.time);
+                courseItem.innerHTML = `
+                    <div>
+                        <div class="text-sm font-medium">${days[course.day - 1]} ${timeSlot ? timeSlot.time : ''}</div>
+                        <div class="text-xs text-gray-500">${course.teacher || 'N/A'} @ ${course.location || 'N/A'}</div>
+                    </div>
+                    <i class="fas fa-chevron-right text-gray-400"></i>
+                `;
+                courseItem.addEventListener('click', () => showCourseDetail(course.id));
+                content.appendChild(courseItem);
+            });
+
+            groupItem.appendChild(header);
+            groupItem.appendChild(content);
+            courseList.appendChild(groupItem);
+        });
+    }
+
+
+    function showAddCourseModal() {
+        editingCourseId = null;
+        modalTitle.textContent = '添加新课程';
+        // Reset form fields
+        document.getElementById('courseName').value = '';
+        document.getElementById('courseTeacher').value = '';
+        document.getElementById('courseLocation').value = '';
+        document.getElementById('courseDay').value = '1'; // Default to Monday
+        document.getElementById('courseTime').value = '1'; // Default to first time slot
+        // Reset color picker selection visual state
+        selectedColor = 'bg-indigo-400'; // Reset to default for add mode
+        document.getElementById('courseColor').value = selectedColor;
+        document.querySelectorAll('.color-picker').forEach(picker => {
+            picker.classList.remove('ring-2', 'ring-offset-2', 'ring-black');
+            if (picker.dataset.color === selectedColor) {
+                picker.classList.add('ring-2', 'ring-offset-2', 'ring-black');
+            }
+        });
+        // Hide delete button in add mode
+        deleteBtn.classList.add('hidden');
+        // Show the modal
+        courseModal.classList.remove('modal-hidden');
+    }
+
+    function showEditCourseModal(courseId) {
+        // Find the course in the *current* frontend array
+        const course = courses.find(c => c.id === courseId);
+        if (!course) {
+            console.error(`Course with ID ${courseId} not found for editing.`);
+            alert("无法编辑：未找到该课程。");
+            return;
+        }
+
+        editingCourseId = courseId;
+        modalTitle.textContent = '编辑课程';
+        // Populate form fields
+        document.getElementById('courseName').value = course.name || '';
+        document.getElementById('courseTeacher').value = course.teacher || '';
+        document.getElementById('courseLocation').value = course.location || '';
+        document.getElementById('courseDay').value = course.day;
+        document.getElementById('courseTime').value = course.time;
+        // Set color picker
+        selectedColor = course.color || 'bg-gray-400'; // Use course color or default
+        document.getElementById('courseColor').value = selectedColor;
+        document.querySelectorAll('.color-picker').forEach(picker => {
+            picker.classList.remove('ring-2', 'ring-offset-2', 'ring-black');
+            if (picker.dataset.color === selectedColor) {
+                picker.classList.add('ring-2', 'ring-offset-2', 'ring-black');
+            }
+        });
+        // Show delete button in edit mode
+        deleteBtn.classList.remove('hidden');
+        // Show the modal
+        courseModal.classList.remove('modal-hidden');
+    }
+
+    function showCourseDetail(courseId) {
+        // Find the course in the *current* frontend array
+        const course = courses.find(c => c.id === courseId);
+        if (!course) {
+             console.error(`Course with ID ${courseId} not found for details.`);
+             alert("无法显示详情：未找到该课程。");
+             return;
+        }
+
+        // Populate detail modal fields
+        document.getElementById('detailTitle').textContent = course.name || '课程详情';
+        document.getElementById('detailName').textContent = course.name || 'N/A';
+        document.getElementById('detailTeacher').textContent = course.teacher || 'N/A';
+        document.getElementById('detailLocation').textContent = course.location || 'N/A';
+        const timeSlot = timeSlots.find(t => t.id === course.time);
+        document.getElementById('detailTime').textContent = `${days[course.day - 1]} ${timeSlot ? timeSlot.time : '未知时间'}`;
+        const detailColor = document.getElementById('detailColor');
+        // Clear previous color classes and add the new one
+        detailColor.className = `w-6 h-6 rounded-full inline-block ${course.color || 'bg-gray-400'}`;
+
+        // Set up edit button listener for this specific course
+        editBtn.onclick = () => {
+            detailModal.classList.add('modal-hidden'); // Hide detail modal
+            showEditCourseModal(courseId); // Show edit modal for this course
+        };
+
+        // Show the detail modal
+        detailModal.classList.remove('modal-hidden');
+    }
+
+    // ==========================================
+    //  DATA OPERATIONS (CRUD via API)
+    // ==========================================
+
+    function saveCourse() {
+        // Get data from form
+        const name = document.getElementById('courseName').value.trim();
+        const teacher = document.getElementById('courseTeacher').value.trim();
+        const location = document.getElementById('courseLocation').value.trim();
+        const day = parseInt(document.getElementById('courseDay').value);
+        const time = parseInt(document.getElementById('courseTime').value);
+        const color = document.getElementById('courseColor').value; // This is set when a color picker is clicked
+
+        // Basic frontend validation
+        if (!name) { // Allow teacher/location to be empty now if backend handles defaults
+            alert('请填写课程名称');
+            return;
+        }
+
+        const courseData = { name, teacher, location, day, time, color };
+
+        let apiUrl;
+        let method;
+
+        if (editingCourseId !== null) {
+            // --- UPDATE ---
+            apiUrl = `/api/courses/${editingCourseId}`;
+            method = 'PUT';
+            // No need to send ID in body if it's in the URL, but doesn't hurt
+            // courseData.id = editingCourseId;
+        } else {
+            // --- CREATE ---
+            apiUrl = '/api/courses';
+            method = 'POST';
+        }
+
+        console.log(`Sending ${method} request to ${apiUrl} with data:`, courseData);
+
+        // Send data to backend
+        fetch(apiUrl, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                // Add authentication headers if needed in the future
+                // 'Authorization': 'Bearer ' + getToken()
+            },
+            body: JSON.stringify(courseData),
+        })
+        .then(response => {
+            if (!response.ok) {
+                // Try to parse error message from backend response body
+                return response.json().then(errData => {
+                    throw new Error(errData.error || `保存失败，服务器状态码: ${response.status}`);
+                }).catch(() => {
+                    // If parsing error fails, throw generic error
+                    throw new Error(`保存失败，服务器状态码: ${response.status}`);
+                });
+            }
+            return response.json(); // Parse successful response
+        })
+        .then(savedCourse => {
+            console.log('Course saved/updated successfully:', savedCourse);
+            courseModal.classList.add('modal-hidden'); // Hide modal on success
+            loadCourses(); // Reload all courses from backend to reflect changes
+        })
+        .catch(error => {
+            console.error('Error saving course:', error);
+            alert(`保存课程时出错: ${error.message}`); // Show error to user
+        });
+    }
+
+    function deleteCourse() {
+        if (editingCourseId === null) return; // Should not happen if button is only visible in edit mode
+
+        if (confirm(`确定要删除课程 "${document.getElementById('courseName').value}" 吗？`)) {
+            // --- DELETE ---
+            fetch(`/api/courses/${editingCourseId}`, {
+                method: 'DELETE',
+                // Add authentication headers if needed
+            })
+            .then(response => {
+                if (!response.ok) {
+                     return response.json().then(errData => {
+                        throw new Error(errData.error || `删除失败，服务器状态码: ${response.status}`);
+                    }).catch(() => {
+                        throw new Error(`删除失败，服务器状态码: ${response.status}`);
+                    });
+                }
+                 // Check if there is content to parse (DELETE might return 200 with msg or 204)
+                 const contentType = response.headers.get("content-type");
+                 if (contentType && contentType.indexOf("application/json") !== -1) {
+                     return response.json(); // Backend sent a confirmation message
+                 } else {
+                     return { message: '删除成功 (No Content)'}; // Assume success for 204
+                 }
+            })
+            .then(result => {
+                console.log('Course deleted:', result.message);
+                courseModal.classList.add('modal-hidden'); // Hide modal
+                loadCourses(); // Reload courses from backend
+            })
+            .catch(error => {
+                console.error('Error deleting course:', error);
+                alert(`删除课程时出错: ${error.message}`);
+            });
+        }
+    }
+
+    // MODIFIED: loadCourses now fetches from API
+    function loadCourses() {
+        console.log("Attempting to load courses from backend...");
+        fetch('/api/courses') // GET request by default
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`加载课程失败，服务器状态码: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Courses loaded from backend:", data);
+                // Ensure data is an array before assigning
+                courses = Array.isArray(data) ? data : [];
+                renderCoursesToSchedule(); // Update schedule grid
+                renderCourseList();       // Update left panel list
+                updateNextClassInfo();    // Update 'next class' card
+            })
+            .catch(error => {
+                console.error("Error loading courses from backend:", error);
+                alert(error.message);
+                courses = []; // Reset local courses on error
+                // Still render empty state
+                renderCoursesToSchedule();
+                renderCourseList();
+                updateNextClassInfo();
+            });
+    }
+
+
+    // ==========================================
+    //  IMPORT/EXPORT (Export is frontend, Import sends data to backend)
+    // ==========================================
+
+    function exportToJson() {
+        if (courses.length === 0) { alert('当前没有课程可以导出'); return; }
+        // Prepare data for export (maybe filter out IDs or add version info if needed)
+        const exportData = courses.map(({ id, ...rest }) => rest); // Exclude frontend ID if backend assigns its own canonical ID upon import/creation
+
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+        const exportFileDefaultName = `课程表_${currentUser ? currentUser.username : 'guest'}_${new Date().toISOString().slice(0,10)}.json`;
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileDefaultName);
+        linkElement.click();
+    }
+
+    function exportToExcel() {
+        if (courses.length === 0) { alert('当前没有课程可以导出'); return; }
+        // Map course data to Excel format
+        const excelData = courses.map(course => ({
+            '课程名称': course.name,
+            '授课教师': course.teacher || '',
+            '上课地点': course.location || '',
+            '星期': days[course.day - 1] || `未知(${course.day})`,
+            '时间段ID': course.time, // Export ID for easier re-import parsing
+            '时间段': timeSlots.find(t => t.id === course.time)?.time || `未知(${course.time})`,
+            '颜色': course.color || '' // Export color class
+        }));
+
+        try {
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(excelData);
+            XLSX.utils.book_append_sheet(wb, ws, '课程表');
+            const fileName = `课程表_${currentUser ? currentUser.username : 'guest'}_${new Date().toISOString().slice(0,10)}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+        } catch (error) {
+             console.error("Error exporting to Excel:", error);
+             alert("导出 Excel 失败。请确保浏览器支持或检查控制台日志。");
+        }
+    }
+
+    // handleImportFile reads and parses, then stores result in importCoursesData
+    function handleImportFile(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            let rawData;
+            let parsedCourses = [];
+            try {
+                if (file.name.endsWith('.json')) {
+                    rawData = JSON.parse(e.target.result);
+                    if (!Array.isArray(rawData)) throw new Error('JSON 文件内容必须是一个课程数组.');
+                    // Basic validation and transformation for JSON
+                    parsedCourses = rawData.map((item, index) => {
+                         // Assume JSON structure matches expected fields slightly better
+                         const course = { ...item };
+                         // Ensure day/time are numbers
+                         course.day = parseInt(item.day, 10);
+                         course.time = parseInt(item.time, 10);
+                         // Use validation function
+                         return isValidCourse(course, index) ? course : null;
+                    }).filter(Boolean); // Remove nulls from invalid entries
+
+                } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                    const workbook = XLSX.read(e.target.result, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    if (!firstSheetName) throw new Error('Excel 文件不包含工作表.');
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    rawData = XLSX.utils.sheet_to_json(worksheet);
+                     if (!Array.isArray(rawData)) throw new Error('无法从 Excel 工作表解析数据为数组.');
+
+                    // Validation and transformation for Excel
+                    parsedCourses = rawData.map((item, index) => {
+                         const dayIndex = days.indexOf(item['星期']);
+                         // Try parsing time from ID first, then from text
+                         let timeSlotId = parseInt(item['时间段ID'], 10);
+                         if (isNaN(timeSlotId)) {
+                             const timeSlot = timeSlots.find(t => t.time === item['时间段']);
+                             timeSlotId = timeSlot ? timeSlot.id : null;
+                         }
+
+                         const course = {
+                             name: item['课程名称']?.toString().trim() || null, // Mark null if missing name
+                             teacher: item['授课教师']?.toString().trim() || 'N/A',
+                             location: item['上课地点']?.toString().trim() || 'N/A',
+                             day: dayIndex !== -1 ? dayIndex + 1 : null, // Mark null if invalid day
+                             time: timeSlotId, // Mark null if invalid time
+                             color: item['颜色']?.toString().trim() || null // Mark null if missing color
+                         };
+                         return isValidCourse(course, index) ? course : null; // Use validation
+                    }).filter(Boolean); // Remove nulls
+
+                } else {
+                    throw new Error('不支持的文件格式. 请选择 .json, .xlsx, 或 .xls 文件.');
+                }
+
+                if (parsedCourses.length === 0) {
+                    alert('导入文件没有包含任何有效的课程数据或格式不正确。');
+                    importFileInput.value = ''; // Reset file input
+                    return;
+                }
+
+                // Store parsed data globally for confirmation step
+                importCoursesData = parsedCourses;
+                importCourseCount.textContent = parsedCourses.length;
+                importConfirmModal.classList.remove('modal-hidden'); // Show confirmation modal
+
+            } catch (error) {
+                console.error('导入错误:', error);
+                alert(`导入失败: ${error.message}`);
+                importFileInput.value = ''; // Reset file input
+                importCoursesData = []; // Clear potentially partial data
+            }
+        };
+
+        reader.onerror = function() {
+            alert('文件读取失败');
+            importFileInput.value = '';
+             importCoursesData = [];
+        };
+
+        // Read file based on type
+        if (file.name.endsWith('.json')) {
+            reader.readAsText(file);
+        } else {
+            reader.readAsArrayBuffer(file);
+        }
+    }
+
+    // MODIFIED: confirmImport sends data to backend API
+    function confirmImport() {
+        if (!Array.isArray(importCoursesData) || importCoursesData.length === 0) {
+            alert("没有有效的课程数据可供导入。");
+            importConfirmModal.classList.add('modal-hidden');
+            importFileInput.value = '';
+            return;
+        }
+
+        console.log("Sending imported data to backend:", importCoursesData);
+
+        // --- IMPORT via API ---
+        fetch('/api/courses/import', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // Add auth headers if needed
+            },
+            body: JSON.stringify(importCoursesData), // Send the parsed array
+        })
+        .then(response => {
+             if (!response.ok) {
+                 return response.json().then(errData => {
+                    throw new Error(errData.error || `导入失败，服务器状态码: ${response.status}`);
+                }).catch(() => {
+                    throw new Error(`导入失败，服务器状态码: ${response.status}`);
+                });
+            }
+            return response.json(); // Expecting { message: "..." } on success
+        })
+        .then(result => {
+            console.log('Import result:', result.message);
+            alert(result.message || `成功导入 ${importCoursesData.length} 门课程`); // Show success message
+            importConfirmModal.classList.add('modal-hidden'); // Hide modal
+            importFileInput.value = ''; // Reset file input
+            importCoursesData = []; // Clear temp data
+            loadCourses(); // Reload courses from backend to show imported data
+        })
+        .catch(error => {
+            console.error('Error importing courses:', error);
+            alert(`导入课程时出错: ${error.message}`);
+            // Keep modal open or hide? Hiding might be less confusing.
+            importConfirmModal.classList.add('modal-hidden');
+            importFileInput.value = '';
+            importCoursesData = [];
+        });
+    }
+
+    // ==========================================
+    //  NEXT CLASS CARD LOGIC (Remains the same, operates on frontend `courses` array)
+    // ==========================================
+
+    let nextClassCountdownInterval; // Declare interval variable globally
+
+    function updateNextClassInfo() {
+        // This logic operates purely on the `courses` array loaded into the frontend
+        const now = new Date();
+        const currentDayVal = getCurrentDay(); // Use renamed variable
+        const currentTimeVal = getCurrentTime(); // Use renamed variable
+        let upcomingCourses = [];
+
+        // Find today's upcoming courses
+        const todayCourses = courses.filter(course => course.day === currentDayVal);
+        for (const course of todayCourses) {
+            const timeSlot = timeSlots.find(t => t.id === course.time);
+            if (timeSlot && timeSlot.startTime > currentTimeVal) {
+                upcomingCourses.push({ ...course, startTime: timeSlot.startTime, endTime: timeSlot.endTime, dayDiff: 0 });
+            }
+        }
+
+        // If no upcoming courses today, look for courses in the next few days
+        if (upcomingCourses.length === 0) {
+             for (let dayDiff = 1; dayDiff < 7; dayDiff++) {
+                 const targetDay = ((currentDayVal + dayDiff - 1) % 7) + 1;
+                 const targetCourses = courses.filter(course => course.day === targetDay);
+                 for (const course of targetCourses) {
+                     const timeSlot = timeSlots.find(t => t.id === course.time);
+                     if (timeSlot) {
+                         // Only add if we haven't found any closer courses yet
+                         if (upcomingCourses.every(uc => uc.dayDiff >= dayDiff)) {
+                            upcomingCourses.push({ ...course, startTime: timeSlot.startTime, endTime: timeSlot.endTime, dayDiff });
+                         }
+                     }
+                 }
+                 // If we found courses for this day, stop searching further days
+                 if (upcomingCourses.some(c => c.dayDiff === dayDiff)) break;
+             }
+        }
+
+        // Sort upcoming courses by day difference, then start time
+        upcomingCourses.sort((a, b) => {
+            if (a.dayDiff !== b.dayDiff) return a.dayDiff - b.dayDiff;
+            return a.startTime.localeCompare(b.startTime);
+        });
+
+        // Clear previous interval if it exists
+        if (nextClassCountdownInterval) {
+            clearInterval(nextClassCountdownInterval);
+            nextClassCountdownInterval = null; // Reset variable
+        }
+
+        const nextCourse = upcomingCourses[0]; // Get the very next course
+
+        if (nextCourse) {
+            const timeSlot = timeSlots.find(t => t.id === nextCourse.time);
+            // Update card content
+            nextClassInfo.innerHTML = `
+                <div class="text-xl font-bold mb-1">${nextCourse.name}</div>
+                <div class="text-sm opacity-90 mb-2">${nextCourse.teacher || 'N/A'} @ ${nextCourse.location || 'N/A'}</div>
+                <div class="flex items-center justify-between text-sm mb-2">
+                    <span>${days[nextCourse.day - 1]} ${timeSlot ? timeSlot.time : ''}</span>
+                    <span>${nextCourse.dayDiff === 0 ? '今天' : nextCourse.dayDiff === 1 ? '明天' : `${nextCourse.dayDiff}天后`}</span>
+                </div>
+                <div class="h-2 w-full bg-white bg-opacity-20 rounded-full overflow-hidden">
+                    <div id="progressBar" class="h-full bg-white transition-all duration-500" style="width: 0%"></div>
+                </div>
+            `;
+            // Update card background color and pulse effect
+            const currentClasses = nextClassCard.className.split(' ').filter(cls => !cls.startsWith('bg-'));
+            nextClassCard.className = [...currentClasses, nextCourse.color || 'bg-gray-400'].join(' ');
+            if (!nextClassCard.classList.contains('pulse')) {
+                 nextClassCard.classList.add('pulse');
+            }
+
+            // Start countdown timer
+            updateCountdown(nextCourse, timeSlot); // Initial call
+            nextClassCountdownInterval = setInterval(() => updateCountdown(nextCourse, timeSlot), 1000); // Set new interval
+
+        } else {
+            // No upcoming courses found
+            nextClassInfo.innerHTML = `
+                <div class="text-sm opacity-80 mb-1">暂无即将开始的课程</div>
+                <div class="h-2 w-full bg-white bg-opacity-20 rounded-full overflow-hidden">
+                    <div id="progressBar" class="h-full bg-white transition-all duration-500" style="width: 0%"></div>
+                </div>
+            `;
+            // Reset card style (remove specific color and pulse)
+            const currentClasses = nextClassCard.className.split(' ').filter(cls => !cls.startsWith('bg-') && cls !== 'pulse');
+            // Maybe set a default gradient? Or just remove color. Using previous default gradient:
+            nextClassCard.className = 'next-class-card text-white mb-8 p-5'; // Reset to default class
+            countdownElement.textContent = '--:--:--';
+            const progressBarEl = nextClassInfo.querySelector('#progressBar');
+            if(progressBarEl) progressBarEl.style.width = '0%';
+        }
+    }
+
+
+    function updateCountdown(course, timeSlot) {
+        // This logic remains the same as it calculates time difference
+        const now = new Date();
+        let targetDate = new Date();
+        // Adjust targetDate based on dayDiff
+        targetDate.setDate(targetDate.getDate() + course.dayDiff);
+        const [hours, minutes] = timeSlot.startTime.split(':').map(Number);
+        targetDate.setHours(hours, minutes, 0, 0); // Set start time
+
+        let diff = targetDate - now; // Difference in milliseconds
+
+        const progressBarEl = document.getElementById('progressBar');
+
+        if (diff <= 0) { // Course has started or already passed start time
+            const [endHours, endMinutes] = timeSlot.endTime.split(':').map(Number);
+            let endDate = new Date(targetDate); // Use the same target day
+            endDate.setHours(endHours, endMinutes, 0, 0); // Set end time
+
+            if (now < endDate) { // Course is currently in progress
+                countdownElement.textContent = '进行中';
+                if (progressBarEl) {
+                     // Calculate progress within the class duration
+                     const totalDuration = (endDate - targetDate); // Duration in ms
+                     const elapsed = now - targetDate; // Time elapsed since start
+                     const progressPercent = totalDuration > 0 ? Math.min(100, (elapsed / totalDuration) * 100) : 100;
+                     progressBarEl.style.width = `${progressPercent}%`;
+                }
+            } else { // Course has ended
+                countdownElement.textContent = '已结束';
+                if (progressBarEl) progressBarEl.style.width = '100%'; // Show full bar for ended
+                // Stop this interval and trigger check for the *next* one
+                if (nextClassCountdownInterval) clearInterval(nextClassCountdownInterval);
+                nextClassCountdownInterval = null;
+                // Schedule an update slightly later to find the truly next class
+                setTimeout(updateNextClassInfo, 500); // Short delay before refresh
+            }
+            return; // Exit function early if started/ended
+        }
+
+        // If course hasn't started yet, calculate time remaining
+        const daysLeft = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hoursLeft = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutesLeft = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const secondsLeft = Math.floor((diff % (1000 * 60)) / 1000);
+
+        // Update countdown display
+        if (daysLeft > 0) {
+            countdownElement.textContent = `${daysLeft}天 ${hoursLeft}时`;
+        } else {
+            countdownElement.textContent = `${hoursLeft.toString().padStart(2, '0')}:${minutesLeft.toString().padStart(2, '0')}:${secondsLeft.toString().padStart(2, '0')}`;
+        }
+
+        // Reset progress bar until class starts
+        if (progressBarEl) progressBarEl.style.width = '0%';
+    }
+
+
+    // ==========================================
+    //  USER AUTHENTICATION LOGIC (via API)
+    // ==========================================
+
+     // Helper functions to update UI based on login state
+    function updateLoginUI(username) {
+        if (!username) return; // Safety check
+        currentUser = { username: username, initial: username.charAt(0).toUpperCase() };
+        userNotLoggedIn.classList.add('hidden');
+        userLoggedIn.classList.remove('hidden');
+        usernameElement.textContent = currentUser.username;
+        userInitialElement.textContent = currentUser.initial;
+        userDropdown.classList.remove('show'); // Close dropdown if open
+        console.log(`UI updated for logged in user: ${username}`);
+        loadCourses(); // Load courses for the logged-in user
+    }
+
+    function updateLogoutUI() {
+        currentUser = null;
+        userNotLoggedIn.classList.remove('hidden');
+        userLoggedIn.classList.add('hidden');
+        userDropdown.classList.remove('show'); // Ensure dropdown is closed
+        console.log("UI updated for logged out state (guest).");
+        loadCourses(); // Load courses for the 'guest' user (or empty if guest has no data)
+    }
+
+    // Check login status with backend on page load
+    function checkBackendLoginStatus() {
+         console.log("Checking backend login status...");
+         fetch('/api/status')
+             .then(response => {
+                 if (!response.ok) {
+                    // If status check fails, assume logged out for safety
+                    console.warn(`Status check failed: ${response.status}. Assuming logged out.`);
+                    return { user: null };
+                 }
+                 return response.json();
+             })
+             .then(data => {
+                 if (data && data.user) {
+                     console.log("User is logged in:", data.user.username);
+                     updateLoginUI(data.user.username);
+                 } else {
+                     console.log("User is not logged in (guest).");
+                     updateLogoutUI();
+                 }
+             })
+             .catch(error => {
+                 console.error("Error checking login status:", error);
+                 alert("无法检查登录状态，请稍后重试。");
+                 // Fallback to logged-out state
+                 updateLogoutUI();
+             });
+     }
+
+    // MODIFIED: handleLoginSubmit calls API
+    function handleLoginSubmit() {
+        const usernameInput = document.getElementById('loginUsername');
+        const passwordInput = document.getElementById('loginPassword');
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value.trim(); // In real app, never log password
+
+        if (!username || !password) {
+             alert('请输入用户名和密码');
+             return;
+        }
+
+        console.log(`Attempting login for user: ${username}`);
+
+        fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(errData => {
+                   throw new Error(errData.error || `登录失败，状态码: ${response.status}`);
+               }).catch(() => {
+                   throw new Error(`登录失败，状态码: ${response.status}`);
+               });
+            }
+            return response.json(); // Expecting { username, initial }
+        })
+        .then(userData => {
+            console.log(`Login successful for user: ${userData.username}`);
+            loginModal.classList.add('modal-hidden'); // Hide modal first
+            updateLoginUI(userData.username); // Update UI and load courses
+            // Clear form fields AFTER successful login
+            usernameInput.value = '';
+            passwordInput.value = '';
+        })
+        .catch(error => {
+            console.error('Login failed:', error);
+            alert(`登录失败: ${error.message}`);
+            // Optionally clear password field on failure, keep username?
+             passwordInput.value = '';
+        });
+    }
+
+    // MODIFIED: handleRegisterSubmit calls API
+    function handleRegisterSubmit() {
+        const usernameInput = document.getElementById('registerUsername');
+        const emailInput = document.getElementById('registerEmail');
+        const passwordInput = document.getElementById('registerPassword');
+        const confirmPasswordInput = document.getElementById('registerConfirmPassword');
+        const agreeTermsCheckbox = document.getElementById('agreeTerms');
+
+        const username = usernameInput.value.trim();
+        const email = emailInput.value.trim();
+        const password = passwordInput.value.trim();
+        const confirmPassword = confirmPasswordInput.value.trim();
+        const agreeTerms = agreeTermsCheckbox.checked;
+
+        // Frontend Validations (keep these)
+        if (!username || !email || !password || !confirmPassword) { alert('请填写所有必填字段'); return; }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; if (!emailRegex.test(email)) { alert('请输入有效的电子邮箱地址'); return; }
+        if (password !== confirmPassword) { alert('两次输入的密码不一致'); return; }
+        if (password.length < 6) { alert('密码长度不能少于6位'); return; }
+        if (!agreeTerms) { alert('请阅读并同意服务条款'); return; }
+
+        console.log(`Attempting registration for user: ${username}`);
+
+        fetch('/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password }), // Send necessary data
+        })
+        .then(response => {
+             if (!response.ok) {
+                 return response.json().then(errData => {
+                    throw new Error(errData.error || `注册失败，状态码: ${response.status}`);
+                }).catch(() => {
+                    throw new Error(`注册失败，状态码: ${response.status}`);
+                });
+            }
+            return response.json(); // Expecting { username, initial } on success
+        })
+        .then(userData => {
+            console.log(`Registration successful for user: ${userData.username}`);
+            registerModal.classList.add('modal-hidden'); // Hide modal
+            updateLoginUI(userData.username); // Register success = logged in, update UI & load courses
+            // Clear registration form
+            usernameInput.value = ''; emailInput.value = ''; passwordInput.value = ''; confirmPasswordInput.value = ''; agreeTermsCheckbox.checked = false;
+        })
+        .catch(error => {
+            console.error('Registration failed:', error);
+            alert(`注册失败: ${error.message}`);
+        });
+    }
+
+    // Logout function (now just calls API and updates UI)
+    function logout() {
+        console.log("Attempting logout...");
+        fetch('/api/logout', { method: 'POST' })
+         .then(response => {
+             if (!response.ok) {
+                 // Log error but proceed to logout locally anyway
+                 console.warn(`Logout API call failed: ${response.status}. Logging out locally.`);
+             }
+             return response.json().catch(() => ({ message: 'Logout processed locally after API issue.' })); // Ensure promise resolves
+         })
+         .then(data => {
+             console.log("Logout response:", data.message);
+             updateLogoutUI(); // Update UI to logged-out state
+         })
+         .catch(error => {
+             console.error('Logout error:', error);
+             alert("登出时发生错误，但已在本地登出。");
+             // Ensure UI updates even if fetch fails completely
+             updateLogoutUI();
+         });
+    }
+
+
+    // ==========================================
+    //  POETRY CARD LOGIC (via API)
+    // ==========================================
+    // Removed local poetryDatabase
+
+    function fetchPoetry() {
+        console.log("Fetching poetry from backend...");
+        refreshPoetryBtn.classList.add('loading');
+        poetryTextEl.textContent = '正在加载...';
+        poetryAuthorEl.textContent = '';
+
+        fetch('/api/poetry')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`加载诗词失败，状态码: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(poem => {
+                if (poem && poem.content && poem.author) {
+                    poetryTextEl.textContent = poem.content;
+                    poetryAuthorEl.textContent = `— ${poem.author}`;
+                } else {
+                    // Handle case where backend returns unexpected structure
+                    throw new Error("收到的诗词数据格式无效");
+                }
+                refreshPoetryBtn.classList.remove('loading');
+            })
+            .catch(error => {
+                console.error("Error fetching poetry:", error);
+                poetryTextEl.textContent = '加载诗词失败';
+                poetryAuthorEl.textContent = '';
+                refreshPoetryBtn.classList.remove('loading');
+                // Optionally show an alert or keep the error message displayed
+                // alert("加载诗词失败，请稍后再试。");
+            });
+    }
+
+    // ==========================================
+    //  EVENT LISTENERS INITIALIZATION (Most remain the same, logout listener modified)
+    // ==========================================
+    function initEventListeners() {
+        // Modal triggers
+        addCourseBtn.addEventListener('click', showAddCourseModal);
+        loginBtn.addEventListener('click', () => loginModal.classList.remove('modal-hidden'));
+        registerBtn.addEventListener('click', () => registerModal.classList.remove('modal-hidden'));
+
+        // Course Modal buttons
+        saveBtn.addEventListener('click', saveCourse);
+        deleteBtn.addEventListener('click', deleteCourse);
+        cancelBtn.addEventListener('click', () => courseModal.classList.add('modal-hidden'));
+
+        // Detail Modal buttons
+        closeDetailBtn.addEventListener('click', () => detailModal.classList.add('modal-hidden'));
+        // editBtn listener is set dynamically in showCourseDetail
+
+        // Auth Modal buttons
+        loginCancelBtn.addEventListener('click', () => loginModal.classList.add('modal-hidden'));
+        registerCancelBtn.addEventListener('click', () => registerModal.classList.add('modal-hidden'));
+        loginSubmitBtn.addEventListener('click', handleLoginSubmit);
+        registerSubmitBtn.addEventListener('click', handleRegisterSubmit);
+        switchToRegister.addEventListener('click', () => { loginModal.classList.add('modal-hidden'); registerModal.classList.remove('modal-hidden'); });
+        switchToLogin.addEventListener('click', () => { registerModal.classList.add('modal-hidden'); loginModal.classList.remove('modal-hidden'); });
+
+        // User Menu
+        userMenuBtn.addEventListener('click', (e) => { e.stopPropagation(); userDropdown.classList.toggle('show'); });
+        // MODIFIED: Logout button now calls the logout function which handles API call
+        logoutBtn.addEventListener('click', logout);
+        // Close dropdown if clicked outside
+        document.addEventListener('click', (e) => {
+             if (userDropdown && userMenuBtn && !userDropdown.contains(e.target) && !userMenuBtn.contains(e.target)) {
+                 userDropdown.classList.remove('show');
+             }
+        });
+
+        // Import/Export buttons
+        exportJsonBtn.addEventListener('click', exportToJson);
+        exportExcelBtn.addEventListener('click', exportToExcel);
+        importFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handleImportFile(file);
+             } else {
+                 // Reset if no file selected (e.g., user cancelled)
+                 importFileInput.value = '';
+                 importCoursesData = [];
+             }
+        });
+        importConfirmBtn.addEventListener('click', confirmImport);
+        importCancelBtn.addEventListener('click', () => {
+             importConfirmModal.classList.add('modal-hidden');
+             importFileInput.value = ''; // Reset file input
+             importCoursesData = []; // Clear any parsed data
+        });
+
+        // Other UI elements
+        searchInput.addEventListener('input', (e) => renderCourseList(e.target.value));
+        refreshPoetryBtn.addEventListener('click', fetchPoetry);
+
+        // Color Picker listeners
+        document.querySelectorAll('.color-picker').forEach(picker => {
+            picker.addEventListener('click', () => {
+                document.querySelectorAll('.color-picker').forEach(p => p.classList.remove('ring-2', 'ring-offset-2', 'ring-black'));
+                picker.classList.add('ring-2', 'ring-offset-2', 'ring-black');
+                selectedColor = picker.dataset.color; // Update selectedColor variable
+                document.getElementById('courseColor').value = selectedColor; // Update hidden input
+            });
+        });
+
+        // Close modals on background click (ensure this exists and works for all modals)
+         [courseModal, detailModal, loginModal, registerModal, importConfirmModal].forEach(modal => {
+             if(modal) {
+                 modal.addEventListener('click', (e) => {
+                     // Check if the click is directly on the modal background
+                     if (e.target === modal) {
+                          modal.classList.add('modal-hidden');
+                          // Reset import state if import modal is closed this way
+                          if (modal === importConfirmModal) {
+                               importFileInput.value = '';
+                               importCoursesData = [];
+                          }
+                          // Maybe reset editing state if course modal closed? Depends on desired UX.
+                          // if (modal === courseModal) { editingCourseId = null; }
+                     }
+                 });
+             }
+         });
+    }
+
+    // ==========================================
+    //  APPLICATION INITIALIZATION
+    // ==========================================
+    function initApp() {
+        console.log("Initializing application...");
+        initSchedule();       // Setup empty schedule grid
+        initEventListeners(); // Attach event listeners to buttons etc.
+        // loadCourses(); // REMOVED: loadCourses is now triggered by checkBackendLoginStatus
+        // checkLoginStatus(); // REMOVED: Old local storage check replaced by backend check
+        fetchPoetry();        // Fetch initial poetry
+
+        // Set interval for refreshing date display if needed (Next class updates handled separately)
+        setInterval(() => {
+             if (currentDateElement) {
+                 const displayedDate = currentDateElement.textContent.split(' ')[0];
+                 const currentDateFormatted = formatCurrentDate().split(' ')[0];
+                 if (displayedDate !== currentDateFormatted) {
+                     console.log("Date changed, re-initializing schedule grid and date display.");
+                     // Re-init the grid structure and date, courses will be rendered by loadCourses if needed
+                     initSchedule();
+                     // No need to call loadCourses here, daily refresh isn't strictly necessary unless data changes daily
+                 }
+             }
+             // Note: Next class info updates via its own interval (nextClassCountdownInterval)
+        }, 60 * 1000); // Check every minute
+    }
+
+    // Start the application after the DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+         initApp(); // Basic UI and listeners setup
+         checkBackendLoginStatus(); // Check backend for user status and load initial data
+         initializePomodoro(); // Initialize the Pomodoro timer part
+    });
+
+    // ==========================================
+    //  POMODORO TIMER SCRIPT (Kept As Is - Pure Frontend)
+    // ==========================================
+    // Wrap Pomodoro logic in its own initialization function called on DOMContentLoaded
+    function initializePomodoro() {
+        console.log("Initializing Pomodoro Timer...");
+        // --- Pomodoro Timer Variables ---
+        let pomodoroInterval; let timeLeft = 0; let totalTime = 0; let isRunning = false; let currentMode = 'work'; let pomodoroCount = 0; let longBreakInterval = 4;
+        const defaultPomodoroSettings = { workTime: 25, shortBreak: 5, longBreak: 15, longBreakInterval: 4 };
+        let currentPomodoroSettings = JSON.parse(localStorage.getItem('pomodoroSettings')) || { ...defaultPomodoroSettings }; // Pomodoro uses its own localStorage
+        longBreakInterval = currentPomodoroSettings.longBreakInterval;
+
+        // --- DOM Elements --- Check if they exist before assigning ---
+        const pomodoroToggle = document.getElementById('pomodoroToggle');
+        const pomodoroPanel = document.getElementById('pomodoroPanel');
+        const pomodoroTime = document.getElementById('pomodoroTime');
+        const progressCircle = document.getElementById('progressCircle');
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const pomodoroSettingsEl = document.getElementById('pomodoroSettings');
+        const modeBtns = document.querySelectorAll('.pomodoro-mode-btn');
+        const pomodoroStatus = document.getElementById('pomodoroStatus');
+        const workTimeInput = document.getElementById('workTimeInput');
+        const shortBreakInput = document.getElementById('shortBreakInput');
+        const longBreakInput = document.getElementById('longBreakInput');
+
+        // --- Exit if essential Pomodoro elements aren't found ---
+        if (!pomodoroToggle || !pomodoroPanel || !pomodoroTime || !progressCircle || !startBtn || !resetBtn || !settingsBtn || !pomodoroSettingsEl || !workTimeInput || !shortBreakInput || !longBreakInput) {
+            console.warn("Pomodoro timer elements not found. Timer functionality disabled.");
+            if(pomodoroToggle) pomodoroToggle.style.display = 'none'; // Hide the toggle if panel is missing
+            return; // Stop Pomodoro script execution
+        }
+
+        // --- Pomodoro Functions (Keep as they were, self-contained) ---
+        function setupPomodoroUI() {
+            workTimeInput.value = currentPomodoroSettings.workTime;
+            shortBreakInput.value = currentPomodoroSettings.shortBreak;
+            longBreakInput.value = currentPomodoroSettings.longBreak;
+            switchMode('work', true); // Initialize in work mode
+            addPomodoroEventListeners();
+            requestNotificationPermission();
+            console.log("Pomodoro Timer UI setup complete.");
+        }
+
+        function addPomodoroEventListeners() {
+            pomodoroToggle.addEventListener('click', function(e) { e.stopPropagation(); pomodoroPanel.classList.toggle('active'); if (!pomodoroPanel.classList.contains('active')) { pomodoroSettingsEl.style.display = 'none'; } });
+            document.addEventListener('click', function(e) { if (pomodoroPanel && pomodoroToggle && !pomodoroPanel.contains(e.target) && !pomodoroToggle.contains(e.target)) { pomodoroPanel.classList.remove('active'); pomodoroSettingsEl.style.display = 'none'; } });
+            if(pomodoroPanel) pomodoroPanel.addEventListener('click', function(e){ e.stopPropagation(); }); // Prevent clicks inside panel closing it
+            modeBtns.forEach(btn => { btn.addEventListener('click', function() { const mode = this.dataset.mode; if (mode !== currentMode) { switchMode(mode); } }); });
+            startBtn.addEventListener('click', function() { if (isRunning) { pauseTimer(); } else { startTimer(); } });
+            resetBtn.addEventListener('click', function() { resetTimer(); });
+            settingsBtn.addEventListener('click', function() { pomodoroSettingsEl.style.display = pomodoroSettingsEl.style.display === 'none' ? 'block' : 'none'; });
+            workTimeInput.addEventListener('change', savePomodoroSettings); shortBreakInput.addEventListener('change', savePomodoroSettings); longBreakInput.addEventListener('change', savePomodoroSettings);
+        }
+
+        function switchMode(mode, isInitialization = false) {
+            if (!isInitialization) { pauseTimer(); }
+            currentMode = mode;
+            modeBtns.forEach(b => { b.classList.remove('active'); if(b.dataset.mode === mode) { b.classList.add('active'); } });
+            switch (mode) { case 'work': timeLeft = currentPomodoroSettings.workTime * 60; break; case 'shortBreak': timeLeft = currentPomodoroSettings.shortBreak * 60; break; case 'longBreak': timeLeft = currentPomodoroSettings.longBreak * 60; break; default: timeLeft = 25 * 60; } // Fallback
+            totalTime = timeLeft;
+            updateTimerDisplay(timeLeft);
+            updateStatus();
+            console.log(`Switched Pomodoro mode to: ${mode}`);
+        }
+        function startTimer() {
+            if (timeLeft <= 0) return;
+            isRunning = true;
+            startBtn.innerHTML = '<span>暂停</span>';
+            updateStatus();
+            console.log(`Pomodoro timer started (${currentMode})`);
+            pomodoroInterval = setInterval(() => {
+                 timeLeft--;
+                 updateTimerDisplay(timeLeft);
+                 if (timeLeft < 0) { timerComplete(); }
+            }, 1000);
+        }
+        function pauseTimer() {
+            if (!isRunning) return;
+            clearInterval(pomodoroInterval);
+            pomodoroInterval = null;
+            isRunning = false;
+            startBtn.innerHTML = '<span>开始</span>';
+            updateStatus();
+             console.log(`Pomodoro timer paused (${currentMode})`);
+        }
+        function resetTimer() {
+            pauseTimer(); // Ensure timer is stopped
+            switch (currentMode) {
+                 case 'work': timeLeft = currentPomodoroSettings.workTime * 60; break;
+                 case 'shortBreak': timeLeft = currentPomodoroSettings.shortBreak * 60; break;
+                 case 'longBreak': timeLeft = currentPomodoroSettings.longBreak * 60; break;
+                 default: timeLeft = 25 * 60;
+            }
+            totalTime = timeLeft;
+            updateTimerDisplay(timeLeft);
+            updateStatus(); // Update status text
+            console.log(`Pomodoro timer reset (${currentMode})`);
+        }
+        function timerComplete() {
+            pauseTimer(); // Stop the interval
+            playSoundNotification();
+            let nextMode; let notificationBody;
+            if (currentMode === 'work') {
+                pomodoroCount++;
+                if (pomodoroCount % longBreakInterval === 0) {
+                    nextMode = 'longBreak'; notificationBody = `工作 (${pomodoroCount}) 完成! 开始长休息 (${currentPomodoroSettings.longBreak} 分钟).`;
+                } else {
+                    nextMode = 'shortBreak'; notificationBody = `工作 (${pomodoroCount}) 完成! 开始短休息 (${currentPomodoroSettings.shortBreak} 分钟).`;
+                }
+            } else { // If currently on break
+                nextMode = 'work'; notificationBody = '休息结束! 准备开始工作.';
+            }
+            showNotification('番茄钟', notificationBody);
+            switchMode(nextMode); // Switch to the next mode
+            // Optionally auto-start the next timer? Current setup requires manual start.
+        }
+        function updateTimerDisplay(seconds) {
+            if (!pomodoroTime || !progressCircle) return;
+            const displaySeconds = Math.max(0, seconds);
+            const minutes = Math.floor(displaySeconds / 60);
+            const remainingSeconds = displaySeconds % 60;
+            pomodoroTime.textContent = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            const circumference = 2 * Math.PI * 45; // Radius is 45
+            let progress = 0;
+            if (totalTime > 0) { progress = (totalTime - displaySeconds) / totalTime; }
+            const offset = circumference * (1 - progress);
+            progressCircle.style.strokeDashoffset = Math.max(0, offset); // Ensure offset isn't negative
+            // Update progress circle color based on mode
+            switch (currentMode) { case 'work': progressCircle.style.stroke = '#f43f5e'; break; case 'shortBreak': progressCircle.style.stroke = '#3b82f6'; break; case 'longBreak': progressCircle.style.stroke = '#10b981'; break; }
+        }
+        function updateStatus() {
+            if (!pomodoroStatus) return;
+            let statusText = '';
+            const sessionNumber = (currentMode === 'work') ? `(${pomodoroCount + 1}/${longBreakInterval})` : '';
+            switch (currentMode) { case 'work': statusText = `工作 ${sessionNumber}`; break; case 'shortBreak': statusText = '短休息'; break; case 'longBreak': statusText = '长休息'; break; }
+            if (isRunning) { statusText += ' - 运行中'; }
+            else if (timeLeft > 0 && timeLeft < totalTime) { statusText += ' - 已暂停'; }
+            else if (timeLeft === totalTime && totalTime > 0){ statusText += ' - 准备就绪'; }
+            else if (timeLeft <= 0) { statusText += ' - 时间到'; }
+             pomodoroStatus.textContent = statusText;
+        }
+        function savePomodoroSettings() {
+            const workTime = parseInt(workTimeInput.value);
+            const shortBreak = parseInt(shortBreakInput.value);
+            const longBreak = parseInt(longBreakInput.value);
+            let changed = false;
+            // Validate and update settings
+            if (!isNaN(workTime) && workTime >= 1 && workTime <= 60 && workTime !== currentPomodoroSettings.workTime) { currentPomodoroSettings.workTime = workTime; changed = true; }
+            if (!isNaN(shortBreak) && shortBreak >= 1 && shortBreak <= 30 && shortBreak !== currentPomodoroSettings.shortBreak) { currentPomodoroSettings.shortBreak = shortBreak; changed = true; }
+            if (!isNaN(longBreak) && longBreak >= 1 && longBreak <= 60 && longBreak !== currentPomodoroSettings.longBreak) { currentPomodoroSettings.longBreak = longBreak; changed = true; }
+            // Ensure inputs reflect the potentially clamped values
+            workTimeInput.value = currentPomodoroSettings.workTime;
+            shortBreakInput.value = currentPomodoroSettings.shortBreak;
+            longBreakInput.value = currentPomodoroSettings.longBreak;
+            // Save to its localStorage
+            localStorage.setItem('pomodoroSettings', JSON.stringify(currentPomodoroSettings));
+            if (changed && !isRunning) { // Only reset if settings changed and timer isn't running
+                 resetTimer();
+                 console.log("Pomodoro settings saved and timer reset.");
+            } else if (changed && isRunning) {
+                 console.log("Pomodoro settings saved. Reset timer after current session to apply.");
+                 // Optionally alert the user settings will apply next time.
+            } else {
+                 console.log("Pomodoro settings saved (no changes detected or timer running).");
+            }
+        }
+        function requestNotificationPermission() {
+             if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+                 Notification.requestPermission().then(permission => { console.log(`Notification permission: ${permission}.`); });
+             } else {
+                 console.log(`Notification status: ${Notification.permission}`);
+             }
+        }
+        function showNotification(title, body) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                // Use a generic icon or try to load one if available
+                const options = {
+                    body: body,
+                    // icon: '/path/to/icon.png' // Optional: Add an icon URL
+                };
+                 try {
+                     new Notification(title, options);
+                 } catch (err) {
+                     console.error('Error showing notification:', err);
+                 }
+            } else {
+                console.log('Notification permission not granted or not supported.');
+                // Maybe provide a fallback in-page alert?
+            }
+        }
+        function playSoundNotification() {
+            // Use a reliable, simple sound URL or embed one
+            try {
+                // Using a common notification sound URL
+                const audio = new Audio('https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3'); // Example sound
+                audio.play().catch(e => console.error("Error playing sound:", e));
+            } catch (e) {
+                console.error("Could not play sound notification:", e);
+            }
+        }
+
+        // Actually start the Pomodoro setup
+        setupPomodoroUI();
+    } // End of initializePomodoro
+
+</script>
+
+</body>
+</html>

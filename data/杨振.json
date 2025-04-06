@@ -1,0 +1,31 @@
+{
+  "courses": [
+    {
+      "name": "操作系统原理",
+      "teacher": "刘宁",
+      "location": "教学大楼C栋-东C303",
+      "day": 1,
+      "time": 1,
+      "color": "bg-red-400",
+      "id": 1743931095114
+    },
+    {
+      "name": "操作系统原理",
+      "teacher": "刘宁",
+      "location": "教学大楼C栋-东C303",
+      "day": 1,
+      "time": 2,
+      "color": "bg-red-400",
+      "id": 1743931186437
+    },
+    {
+      "name": "软件工程",
+      "teacher": "郑贵锋",
+      "location": "教学大楼D栋-东D303",
+      "day": 1,
+      "time": 3,
+      "color": "bg-blue-400",
+      "id": 1743931267580
+    }
+  ]
+}
